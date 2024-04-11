@@ -1071,7 +1071,6 @@ class _AssetListState extends State<AssetList> {
                             ),
                           );
                         }
-
                         // Retorna um Container vazio para ativos totalmente liquidados
                         return Container();
                       },
@@ -1099,10 +1098,10 @@ class _AssetListState extends State<AssetList> {
                 _loadAssets();
               }),
               _bottomAction(
-                  FontAwesomeIcons.chartPie, () => navigateToGraphPage(assets)),
+                  FontAwesomeIcons.house, () => returnToHomePage(context)),
               const SizedBox(width: 48.0),
               _bottomAction(
-                  FontAwesomeIcons.house, () => returnToHomePage(context)),
+                  FontAwesomeIcons.chartPie, () => navigateToGraphPage(assets)),
               _bottomAction(Icons.settings, () => navigateToGraphPage),
             ],
           ),

@@ -48,7 +48,10 @@ dependencies:
   carousel_slider:
   auto_animated:
   shimmer: ^2.0.0
+  charts_flutter:
+  syncfusion_flutter_charts:
   flutter_svg_provider:
+  google_mobile_ads: ^5.0.0
 
 dev_dependencies:
   flutter_test:
