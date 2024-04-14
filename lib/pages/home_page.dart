@@ -463,6 +463,7 @@ class _HomePageState extends State<HomePage> {
   AppBar appBarDynamics() {
     if (selecionadas.isEmpty) {
       return AppBar(
+        automaticallyImplyLeading: false,
         title: Row(
           children: [
             Image.asset(
@@ -505,6 +506,7 @@ class _HomePageState extends State<HomePage> {
       );
     } else {
       return AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: Colors.black,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),

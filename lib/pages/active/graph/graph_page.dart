@@ -13,71 +13,391 @@ class GraphPage extends StatefulWidget {
 }
 
 class _GraphPageState extends State<GraphPage> {
-  int touchedIndex = -1;
-
-  void _handleTickerTap(int index) {
-    setState(() {
-      touchedIndex = touchedIndex == index ? -1 : index;
-    });
-  }
+  late int? touchedIndex = -1;
+  String currentFilter = 'all'; // Opções: 'all', 'stocks', 'fiis'
 
   @override
-  Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 6, // Modificado para incluir o novo Tab
-      child: Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back),
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            color: Colors.white, // Defina a cor desejada aqui
-          ),
-          title: const Text(
-            'Gráficos',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white,
+    Widget build(BuildContext context) {
+      return DefaultTabController(
+        length: 4, // Modificado para incluir o novo Tab
+        child: Scaffold(
+          appBar: AppBar(
+            leading: IconButton(
+              icon: Icon(Icons.arrow_back),
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              color: Colors.white, // Defina a cor desejada aqui
+            ),
+            title: const Text(
+              'Gráficos',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.white,
+              ),
+            ),
+            backgroundColor: Colors.black,
+            bottom: const TabBar(
+              tabs: [
+                // Tab(text: 'Posição'),
+                Tab(text: 'Composição'),
+                Tab(text: 'Patrimônio'),
+                Tab(text: 'Rentabilidade'),
+                Tab(text: 'Proventos'),
+              ],
+              labelColor: Colors.white,
+              indicatorColor: Colors.white,
             ),
           ),
-          backgroundColor: Colors.black,
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'Posição'),
-              Tab(text: 'Ativos'),
-              Tab(text: 'Ações'), // Novo Tab para as ações
-              Tab(text: 'Fiis'),
-              Tab(text: 'Evolução'),
-              Tab(text: 'Indices'),
+          body: TabBarView(
+            children: [
+              _buildDistributionChart1(),
+              _buildMonthlyEvolutionChart(),
+              _buildProfitabilityChart(),
+              _buildProfitabilityChart(),
             ],
-            labelColor: Colors.white,
-            indicatorColor: Colors.white,
           ),
         ),
-        body: TabBarView(
-          children: [
-            _buildCurrentPositionChart(),
-            _buildDistributionChart(),
-            _buildStockChart(),
-            _buildFiisChart(),
-            _buildMonthlyEvolutionChart(),
-            _buildProfitabilityChart(),
-          ],
+      );
+    }
+
+  Widget _buildDistributionChart() {
+    List<Asset> filteredAssets = [];
+    switch (currentFilter) {
+      case 'stocks':
+        filteredAssets = widget.assetList
+            .where((asset) =>
+        asset.activeType == 'stocks' && !asset.isFullyLiquidated)
+            .toList();
+        break;
+      case 'fiis':
+        filteredAssets = widget.assetList
+            .where((asset) =>
+        asset.activeType == 'fiis' && !asset.isFullyLiquidated)
+            .toList();
+        break;
+      case 'type_of_assets':  // Nova opção para visualizar a distribuição de ações e FIIs
+        filteredAssets = widget.assetList
+            .where((asset) => !asset.isFullyLiquidated)
+            .toList();
+        break;
+      default:
+        filteredAssets = widget.assetList
+            .where((asset) => !asset.isFullyLiquidated)
+            .toList();
+        break;
+    }
+    return _buildSectorDistributionChart(filteredAssets);
+  }
+
+  Widget _buildDistributionChart1() {
+    List<String> filterOptions = ['type_of_assets', 'all', 'stocks', 'fiis', 'sectors'];
+
+    return Scaffold(
+      body: Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: currentFilter,
+                    icon: Icon(Icons.filter_list, color: Colors.black54),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        currentFilter = newValue ?? 'all';
+                      });
+                    },
+                    items: filterOptions
+                        .map<DropdownMenuItem<String>>((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value.toUpperCase()),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: _buildDistributionChart(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectorDistributionChart(List<Asset> assets) {
+    if (assets.isEmpty) {
+      return Center(child: Text('Nenhuma ação encontrada.'));
+    }
+
+    Map<String, double> typeMap = {};
+
+    Map<String, String> filterTitles = {
+      'all': 'Distribuição por Ativo',
+      'sectors': 'Posição Atual por Setor',
+      'fiis': 'Distribuição por Fiis',
+      'stocks': 'Distribuição por Ações'
+    };
+
+    String title = filterTitles[currentFilter] ?? 'Filtro Desconhecido';
+    Map<String, double> fiisMap = {};
+    Map<String, double> stocksMap = {};
+
+    // Calcula a distribuição para o caso de 'stocks_fiis'
+    if (currentFilter == 'type_of_assets') {
+      for (var asset in assets) {
+        String typeKey = asset.activeType;  // 'stocks' ou 'fiis'
+        typeMap.update(typeKey, (value) => value + asset.totalAmount, ifAbsent: () => asset.totalAmount);
+      }
+      double totalValue = typeMap.values.fold(0, (sum, asset) => sum + asset);
+      List<Color> colors = _getColors(typeMap.length);
+      return _buildPieChart(typeMap, totalValue, colors, "Distribuição Total por Tipo de Ativo");
+    }
+
+    for (var asset in assets) {
+      if (currentFilter == 'sectors') {
+        if (asset.activeType == 'fiis') {
+          fiisMap.update(asset.segment, (value) => value + asset.totalAmount,
+              ifAbsent: () => asset.totalAmount);
+        } else if (asset.activeType == 'stocks') {
+          stocksMap.update(asset.segment, (value) => value + asset.totalAmount,
+              ifAbsent: () => asset.totalAmount);
+        }
+      } else {
+        String key = asset.ticker;
+        fiisMap.update(key, (value) => value + asset.totalAmount,
+            ifAbsent: () => asset.totalAmount);
+      }
+    }
+
+    List<Widget> charts = [];
+    if (currentFilter == 'sectors') {
+      double totalFiisValue =
+          fiisMap.values.fold(0, (sum, asset) => sum + asset);
+      double totalStocksValue =
+          stocksMap.values.fold(0, (sum, asset) => sum + asset);
+      List<Color> fiisColors = _getColors(fiisMap.length);
+      List<Color> stocksColors = _getColors(stocksMap.length);
+
+      Widget fiisChart = _buildPieChart(fiisMap, totalFiisValue, fiisColors,
+          'Distribuição por Setor de FIIs');
+      Widget stocksChart = _buildPieChart(stocksMap, totalStocksValue,
+          stocksColors, 'Distribuição por Setor de Ações');
+
+      charts.add(fiisChart);
+      charts.add(stocksChart);
+    } else {
+      // Mantenha a lógica atual para outros filtros
+      double totalValue = fiisMap.values.fold(0, (sum, asset) => sum + asset);
+      List<Color> colors = _getColors(fiisMap.length);
+      Widget chart = _buildPieChart(fiisMap, totalValue, colors, title);
+      charts.add(chart);
+    }
+
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: charts,
+      ),
+    );
+  }
+
+  Widget _buildPieChart(Map<String, double> assetMap, double totalValue,
+      List<Color> colors, String chartTitle) {
+    List<PieChartSectionData> sections =
+        assetMap.keys.toList().asMap().entries.map((entry) {
+      bool isTouched = entry.key == touchedIndex;
+      return PieChartSectionData(
+        color: colors[entry.key],
+        value: assetMap[entry.value],
+        title:
+            '${(assetMap[entry.value]! / totalValue * 100).toStringAsFixed(2)}%',
+        radius: isTouched ? 100 : 80,
+        titleStyle: TextStyle(
+            fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+        titlePositionPercentageOffset: 0.5,
+      );
+    }).toList();
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+          child: Text(
+            chartTitle,
+            style: TextStyle(
+              fontSize: 16.0,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(
+              left: 16.0, right: 16.0), // Espaçamento em todas as direções
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Wrap(
+              spacing: 12.0, // Espaçamento horizontal entre os botões
+              runSpacing:
+                  12.0, // Espaçamento vertical entre as linhas de botões
+              alignment: WrapAlignment.start,
+              children: assetMap.keys.toList().asMap().entries.map((entry) {
+                return ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      touchedIndex =
+                          touchedIndex == entry.key ? null : entry.key;
+                    });
+                  },
+                  style: ButtonStyle(
+                    backgroundColor:
+                        MaterialStateProperty.all(colors[entry.key]),
+                    shape: MaterialStateProperty.all<RoundedRectangleBorder>(
+                      RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18.0),
+                      ),
+                    ),
+                    padding: MaterialStateProperty.all(
+                        EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0)),
+                  ),
+                  child: Text(
+                    entry.value,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+        SingleChildScrollView(
+          child: Container(
+            height: 300,
+            child: PieChart(
+              PieChartData(
+                pieTouchData: PieTouchData(
+                    touchCallback: (FlTouchEvent event, pieTouchResponse) {
+                  setState(() {
+                    if (!event.isInterestedForInteractions ||
+                        pieTouchResponse == null ||
+                        pieTouchResponse.touchedSection == null) {
+                      touchedIndex = null;
+                      return;
+                    }
+                    touchedIndex =
+                        pieTouchResponse.touchedSection!.touchedSectionIndex;
+                  });
+                }),
+                borderData: FlBorderData(show: false),
+                sectionsSpace: 5,
+                centerSpaceRadius: 50,
+                sections: sections,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+
+  List<Color> _getColors(int count) {
+    List<Color> palette = [
+      Color(0xFF4FC3F7),
+      Color(0xFF81C784),
+      Color(0xFFFFB74D),
+      Color(0xFF9575CD),
+      Color(0xFFFF867C),
+      Color(0xFF616161),
+      Color(0xFF7E57C2),
+      Color(0xFF26A69A),
+      Color(0xFFF06292),
+      Color(0xFF8D6E63),
+      Color(0xFF78909C),
+    ];
+    return List.generate(count, (index) => palette[index % palette.length]);
+  }
+
+  Color _getColor(int index) {
+    final List<Color> colors = [
+      Color(0xFF4FC3F7),
+      Color(0xFF81C784),
+      Color(0xFFFFB74D),
+      Color(0xFF9575CD),
+      Color(0xFFFF867C),
+      Color(0xFF616161),
+      Color(0xFF7E57C2),
+      Color(0xFF26A69A),
+      Color(0xFFF06292),
+      Color(0xFF8D6E63),
+      Color(0xFF78909C),
+    ];
+
+    return colors[index % colors.length];
+  }
+
+  Widget _buildProfitabilityChart() {
+    // Simulação de dados para a rentabilidade da carteira e do CDI
+    List<Map<String, dynamic>> data = [
+      {'label': 'Out', 'carteira': -0.40, 'cdi': 1.01},
+      {'label': 'Nov', 'carteira': 6.345, 'cdi': 1.01},
+      {'label': 'Dez', 'carteira': 1.105, 'cdi': 1.01},
+      // Adicione mais pontos de dados conforme necessário
+    ];
+
+    return Scaffold(
+      body: Align(
+        alignment: Alignment.center,
+        child: SizedBox(
+          width: 400,
+          height: 300,
+          child: LineChart(
+            LineChartData(
+              gridData: FlGridData(show: false),
+              titlesData: FlTitlesData(show: false),
+              borderData: FlBorderData(show: true),
+              minX: 0,
+              maxX: data.length.toDouble() - 1,
+              minY: -1,
+              maxY: 8,
+              lineBarsData: [
+                _buildLineChartBarData(data, 'carteira', _getColor(0)),
+                _buildLineChartBarData(data, 'cdi', _getColor(1)),
+              ],
+            ),
+          ),
         ),
       ),
+    );
+  }
+
+  LineChartBarData _buildLineChartBarData(
+      List<Map<String, dynamic>> data, String key, Color color) {
+    return LineChartBarData(
+      spots: _getDataSpots(data, key),
+      isCurved: true,
+      colors: [color],
+      belowBarData: BarAreaData(show: false),
     );
   }
 
   Widget _buildMonthlyEvolutionChart() {
     // Filtrar os ativos não liquidados
     final List<Asset> nonLiquidatedAssets =
-    widget.assetList.where((asset) => !asset.isFullyLiquidated).toList();
+        widget.assetList.where((asset) => !asset.isFullyLiquidated).toList();
 
     // Consolidar todas as transações dos ativos não liquidados
-    final List<Transaction> allTransactions = nonLiquidatedAssets
-        .expand((asset) => asset.transactions)
-        .toList();
+    final List<Transaction> allTransactions =
+        nonLiquidatedAssets.expand((asset) => asset.transactions).toList();
 
     allTransactions.sort((a, b) {
       if (a.date.year != b.date.year) {
@@ -90,9 +410,11 @@ class _GraphPageState extends State<GraphPage> {
     final Map<String, double> monthlyBalances = {};
 
     for (var transaction in allTransactions) {
-      final String monthYear = '${transaction.date.month}-${transaction.date.year}';
+      final String monthYear =
+          '${transaction.date.month}-${transaction.date.year}';
       monthlyBalances[monthYear] ??= 0;
-      monthlyBalances[monthYear] = (monthlyBalances[monthYear] ?? 0) + transaction.amount;
+      monthlyBalances[monthYear] =
+          (monthlyBalances[monthYear] ?? 0) + transaction.amount;
     }
 
     // Extrair meses e anos únicos para criar as barras
@@ -146,905 +468,6 @@ class _GraphPageState extends State<GraphPage> {
           barGroups: barGroups,
         ),
       ),
-    );
-  }
-
-
-  //
-  // Widget _buildMonthlyEvolutionChart() {
-  //   // Filtrar os ativos não liquidados
-  //   final List<Asset> nonLiquidatedAssets =
-  //   widget.assetList.where((asset) => !asset.isFullyLiquidated).toList();
-  //
-  //   // Consolidar todas as transações dos ativos não liquidados
-  //   final List<Transaction> allTransactions = nonLiquidatedAssets
-  //       .expand((asset) => asset.transactions)
-  //       .toList();
-  //
-  //   // Ordenar as transações por data
-  //   allTransactions.sort((a, b) => a.date.compareTo(b.date));
-  //
-  //   // Calcular o saldo acumulado mensal
-  //   final Map<String, double> monthlyBalances = {};
-  //
-  //   for (var transaction in allTransactions) {
-  //     final String monthYear = '${transaction.date.month}-${transaction.date.year}';
-  //     monthlyBalances[monthYear] ??= 0;
-  //     monthlyBalances[monthYear] = (monthlyBalances[monthYear] ?? 0) + transaction.amount;
-  //   }
-  //
-  //   // Extrair meses e anos únicos para criar as barras
-  //   final List<String> uniqueMonths = monthlyBalances.keys.toList();
-  //   uniqueMonths.sort(); // Ordenar para garantir a ordem correta no gráfico
-  //
-  //   // Criar barras para cada mês
-  //   final List<BarChartGroupData> barGroups = uniqueMonths.map((monthYear) {
-  //     return BarChartGroupData(
-  //       x: uniqueMonths.indexOf(monthYear) + 1,
-  //       barRods: [
-  //         BarChartRodData(
-  //           y: monthlyBalances[monthYear]!,
-  //           colors: [Colors.blue],
-  //         ),
-  //       ],
-  //     );
-  //   }).toList();
-  //
-  //   // Construir o gráfico de barras
-  //   return BarChart(
-  //     BarChartData(
-  //       gridData: FlGridData(show: false),
-  //       titlesData: FlTitlesData(show: false),
-  //       borderData: FlBorderData(show: true),
-  //       groupsSpace: 4.0,
-  //       barGroups: barGroups,
-  //     ),
-  //   );
-  // }
-
-  Widget _buildCurrentPositionChart() {
-    // Filtra apenas os ativos não totalmente liquidados
-    final List<Asset> nonLiquidatedAssets =
-        widget.assetList.where((asset) => !asset.isFullyLiquidated).toList();
-
-    // Verifica se há ativos para exibir o gráfico
-    if (nonLiquidatedAssets.isEmpty) {
-      return Center(
-        child: Text('Nenhum ativo encontrado.'),
-      );
-    }
-
-    // Calcula o valor total da carteira
-    double totalPortfolioValue = nonLiquidatedAssets.fold(
-        0, (total, asset) => total + asset.totalAmount);
-
-    // Filtra os ativos do tipo FII
-    final List<Asset> fiiAssets = nonLiquidatedAssets
-        .where((asset) => asset.activeType == 'fiis')
-        .toList();
-
-    // Filtra os ativos do tipo ação
-    final List<Asset> stockAssets = nonLiquidatedAssets
-        .where((asset) => asset.activeType == 'stocks')
-        .toList();
-
-    // Calcula a porcentagem total para cada tipo de ativo
-    double fiiPercentage =
-        fiiAssets.fold(0.0, (total, asset) => total + asset.totalAmount) /
-            totalPortfolioValue *
-            100;
-    double stockPercentage =
-        stockAssets.fold(0.0, (total, asset) => total + asset.totalAmount) /
-            totalPortfolioValue *
-            100;
-
-    return Scaffold(
-      body: Column(
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Text(
-              'Tipo de Ativos',
-              style: TextStyle(
-                fontSize: 16.0,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          Expanded(
-            child: PieChart(
-              PieChartData(
-                pieTouchData: PieTouchData(
-                  touchCallback: (FlTouchEvent event, pieTouchResponse) {
-                    setState(() {
-                      if (!event.isInterestedForInteractions ||
-                          pieTouchResponse == null ||
-                          pieTouchResponse.touchedSection == null) {
-                        touchedIndex = -1;
-                        return;
-                      }
-                      touchedIndex =
-                          pieTouchResponse.touchedSection!.touchedSectionIndex;
-                    });
-                  },
-                ),
-                borderData: FlBorderData(
-                  show: false,
-                ),
-                sectionsSpace: 5,
-                centerSpaceRadius: 50,
-                sections: [
-                  PieChartSectionData(
-                    color: _getColor(0), // Cor para FIIs
-                    value: fiiPercentage,
-                    title: 'FIIs\n${fiiPercentage.toStringAsFixed(2)}%',
-                    radius: 80,
-                    titleStyle: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xffffffff),
-                    ),
-                    titlePositionPercentageOffset: 0.5,
-                  ),
-                  PieChartSectionData(
-                    color: _getColor(1), // Cor para ações
-                    value: stockPercentage,
-                    title: 'Ações\n${stockPercentage.toStringAsFixed(2)}%',
-                    radius: 80,
-                    titleStyle: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xffffffff),
-                    ),
-                    titlePositionPercentageOffset: 0.5,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Text(
-              'Posição Ideal',
-              style: TextStyle(
-                fontSize: 16.0,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          _buildRecommendationChart2(nonLiquidatedAssets)
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDistributionChart() {
-    double totalCurrent = 0;
-
-    final List<Asset> nonLiquidatedAssets =
-        widget.assetList.where((asset) => !asset.isFullyLiquidated).toList();
-
-    for (final asset in nonLiquidatedAssets) {
-      totalCurrent += asset.currentPrice * asset.quantity;
-    }
-
-    return Scaffold(
-      body: Column(
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Text(
-              'Posição Atual',
-              style: TextStyle(
-                fontSize: 16.0,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          Container(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children:
-                    _buildTickerWidgets(nonLiquidatedAssets, totalCurrent),
-              ),
-            ),
-          ),
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: PieChart(
-                    PieChartData(
-                      pieTouchData: PieTouchData(
-                        touchCallback: (FlTouchEvent event, pieTouchResponse) {
-                          setState(() {
-                            if (!event.isInterestedForInteractions ||
-                                pieTouchResponse == null ||
-                                pieTouchResponse.touchedSection == null) {
-                              touchedIndex = -1;
-                              return;
-                            }
-                            touchedIndex = pieTouchResponse
-                                .touchedSection!.touchedSectionIndex;
-                          });
-                        },
-                      ),
-                      borderData: FlBorderData(
-                        show: false,
-                      ),
-                      sectionsSpace: 5,
-                      centerSpaceRadius: 50,
-                      sections: _getSections(nonLiquidatedAssets, totalCurrent),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Text(
-              'Posição Ideal',
-              style: TextStyle(
-                fontSize: 16.0,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          _buildRecommendationChart(nonLiquidatedAssets),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStockChart() {
-    // Filtra apenas as ações da lista de ativos
-    final List<Asset> stockAssets = widget.assetList
-        .where(
-            (asset) => asset.activeType == 'stocks' && !asset.isFullyLiquidated)
-        .toList();
-
-    // Verifica se há ações para exibir o gráfico
-    if (stockAssets.isEmpty) {
-      return Center(
-        child: Text('Nenhuma ação encontrada.'),
-      );
-    }
-
-    // Calcula o total atual das ações
-    double totalStockValue = stockAssets.fold(
-        0, (total, asset) => total + asset.currentPrice * asset.quantity);
-
-    return Scaffold(
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: Text(
-                'Posição Atual',
-                style: TextStyle(
-                  fontSize: 16.0,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            Container(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: _buildTickerWidgets(stockAssets, totalStockValue),
-                ),
-              ),
-            ),
-            Container(
-              height: 300,
-              child: PieChart(
-                PieChartData(
-                  pieTouchData: PieTouchData(
-                    touchCallback: (FlTouchEvent event, pieTouchResponse) {
-                      setState(() {
-                        if (!event.isInterestedForInteractions ||
-                            pieTouchResponse == null ||
-                            pieTouchResponse.touchedSection == null) {
-                          touchedIndex = -1;
-                          return;
-                        }
-                        touchedIndex = pieTouchResponse
-                            .touchedSection!.touchedSectionIndex;
-                      });
-                    },
-                  ),
-                  borderData: FlBorderData(
-                    show: false,
-                  ),
-                  sectionsSpace: 5,
-                  centerSpaceRadius: 50,
-                  sections: _getSections(stockAssets, totalStockValue),
-                ),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: Text(
-                'Posição Ideal',
-                style: TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold),
-              ),
-            ),
-            _buildRecommendationChart(stockAssets),
-            _buildSectorDistributionChart(stockAssets),
-            _getSectorDistributionSections(stockAssets),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFiisChart() {
-    // Filtra apenas as ações da lista de ativos
-    final List<Asset> fiiAssets = widget.assetList
-        .where(
-            (asset) => asset.activeType == 'fiis' && !asset.isFullyLiquidated)
-        .toList();
-
-    // Verifica se há ações para exibir o gráfico
-    if (fiiAssets.isEmpty) {
-      return Center(
-        child: Text('Nenhuma ação encontrada.'),
-      );
-    }
-
-    // Calcula o total atual das ações
-    double totalFiiValue = fiiAssets.fold(
-        0, (total, asset) => total + asset.currentPrice * asset.quantity);
-
-    return Scaffold(
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: Text(
-                'Posição Atual',
-                style: TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold),
-              ),
-            ),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: _buildTickerWidgets(fiiAssets, totalFiiValue),
-              ),
-            ),
-            Container(
-              height: 300,
-              child: PieChart(
-                PieChartData(
-                  pieTouchData: PieTouchData(
-                    touchCallback: (FlTouchEvent event, pieTouchResponse) {
-                      setState(() {
-                        if (!event.isInterestedForInteractions ||
-                            pieTouchResponse == null ||
-                            pieTouchResponse.touchedSection == null) {
-                          touchedIndex = -1;
-                          return;
-                        }
-                        touchedIndex = pieTouchResponse
-                            .touchedSection!.touchedSectionIndex;
-                      });
-                    },
-                  ),
-                  borderData: FlBorderData(
-                    show: false,
-                  ),
-                  sectionsSpace: 5,
-                  centerSpaceRadius: 50,
-                  sections: _getSections(fiiAssets, totalFiiValue),
-                ),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: Text(
-                'Posição Ideal',
-                style: TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold),
-              ),
-            ),
-            _buildRecommendationChart(fiiAssets),
-            _buildSectorDistributionChart(fiiAssets),
-            _getSectorDistributionSections(fiiAssets)
-          ],
-        ),
-      ),
-    );
-  }
-
-  List<PieChartSectionData> _getSections(
-      List<Asset> assets, double totalStockValue) {
-    double percentageOffset = 0.5;
-
-    return List.generate(assets.length, (index) {
-      final isTouched = index == touchedIndex;
-      final double fontSize = isTouched ? 20 : 14;
-      final double radius = isTouched ? 90 : 80;
-
-      return PieChartSectionData(
-        color: _getColor(index),
-        value: assets[index].currentPrice * assets[index].quantity,
-        title:
-            '${((assets[index].currentPrice * assets[index].quantity) / totalStockValue * 100).toStringAsFixed(2)}%',
-        radius: radius,
-        titleStyle: TextStyle(
-          fontSize: fontSize,
-          fontWeight: FontWeight.bold,
-          color: const Color(0xffffffff),
-        ),
-        titlePositionPercentageOffset: percentageOffset,
-      );
-    });
-  }
-
-  List<Widget> _buildTickerWidgets(List<Asset> assets, double totalCurrent) {
-    return assets.asMap().entries.map((entry) {
-      final index = entry.key;
-      final asset = entry.value;
-
-      final rentabilityPercentage =
-          (asset.currentPrice * asset.quantity) / totalCurrent * 100;
-
-      return GestureDetector(
-        onTap: () => _handleTickerTap(index),
-        child: Container(
-          margin: EdgeInsets.all(8.0),
-          padding: EdgeInsets.all(4.0),
-          decoration: BoxDecoration(
-            color: _getColor(index),
-            borderRadius: BorderRadius.circular(4.0),
-            border: Border.all(
-              color: touchedIndex == index ? Colors.yellow : Colors.transparent,
-              width: 2.0,
-            ),
-          ),
-          child: Text(
-            '${asset.ticker} ${rentabilityPercentage.toStringAsFixed(2)}%',
-            style: TextStyle(
-              fontSize: 12.0,
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      );
-    }).toList();
-  }
-
-  Color _getColor(int index) {
-    final List<Color> colors = [
-      Color(0xFF4FC3F7),
-      Color(0xFF81C784),
-      Color(0xFFFFB74D),
-      Color(0xFF9575CD),
-      Color(0xFFFF867C),
-      Color(0xFF616161),
-      Color(0xFF7E57C2),
-      Color(0xFF26A69A),
-      Color(0xFFF06292),
-      Color(0xFF8D6E63),
-      Color(0xFF78909C),
-    ];
-
-    return colors[index % colors.length];
-  }
-
-  Widget _buildRecommendationChart(List<Asset> assets) {
-    double totalValue = assets.fold(
-        0, (total, asset) => total + asset.currentPrice * asset.quantity);
-    double equalDistribution = totalValue / assets.length;
-
-    return Container(
-      height: 300,
-      child: PieChart(
-        PieChartData(
-          borderData: FlBorderData(show: false),
-          sectionsSpace: 5,
-          centerSpaceRadius: 50,
-          sections:
-              _getRecommendationSections(assets, equalDistribution, totalValue),
-        ),
-      ),
-    );
-  }
-
-  Widget _getSectorDistributionSections(List<Asset> stockAssets) {
-    // Se não houver ativos de ações, retorna um widget informativo
-    if (stockAssets.isEmpty) {
-      return Center(
-        child: Text('Nenhuma ação encontrada.'),
-      );
-    }
-
-    // Mapeia os ativos de ações por setor
-    Map<String, double> sectorMap = {};
-    stockAssets.forEach((asset) {
-      sectorMap.update(asset.segment, (value) => value + asset.totalAmount,
-          ifAbsent: () => asset.totalAmount);
-    });
-
-    // Calcula o valor total dos ativos de ações
-    double totalStockValue =
-    stockAssets.fold(0, (total, asset) => total + asset.totalAmount);
-
-    // Filtra setores únicos de ativos com valores associados
-    Set<String> uniqueSectors = sectorMap.keys.toSet();
-
-    // Calcula a porcentagem ideal de forma uniforme para cada setor
-    double idealPercentage = 100.0 / uniqueSectors.length;
-
-    // Cria seções para cada setor
-    List<PieChartSectionData> sectors = [];
-    int colorIndex = 0;
-
-    uniqueSectors.forEach((sector) {
-      Color dynamicColor = _getColor(colorIndex);
-
-      // Calcula a porcentagem para o setor específico
-      double percentage = idealPercentage;
-
-      sectors.add(
-        PieChartSectionData(
-          color: dynamicColor,
-          value: percentage,
-          title: '$sector\n${percentage.toStringAsFixed(2)}%',
-          radius: 80,
-          titleStyle: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Color(0xffffffff),
-          ),
-          titlePositionPercentageOffset: 0.5,
-        ),
-      );
-
-      colorIndex++;
-    });
-
-    // Constrói o gráfico de distribuição por setor
-    return Container(
-      height: 400, // Ajuste conforme necessário
-      child: Column(
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Text(
-              'Posição Ideal',
-              style: TextStyle(
-                fontSize: 16.0,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          Container(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: _buildSectorNameWidgets(uniqueSectors.toList()),
-              ),
-            ),
-          ),
-          Container(
-            height: 300,
-            child: PieChart(
-              PieChartData(
-                pieTouchData: PieTouchData(
-                  touchCallback: (FlTouchEvent event, pieTouchResponse) {
-                    setState(() {
-                      if (!event.isInterestedForInteractions ||
-                          pieTouchResponse == null ||
-                          pieTouchResponse.touchedSection == null) {
-                        touchedIndex = -1;
-                        return;
-                      }
-                      touchedIndex =
-                          pieTouchResponse.touchedSection!.touchedSectionIndex;
-                    });
-                  },
-                ),
-                borderData: FlBorderData(
-                  show: false,
-                ),
-                sectionsSpace: 5,
-                centerSpaceRadius: 50,
-                sections: sectors,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectorDistributionChart(List<Asset> stockAssets) {
-    // Se não houver ativos de ações, retorna um widget informativo
-    if (stockAssets.isEmpty) {
-      return Center(
-        child: Text('Nenhuma ação encontrada.'),
-      );
-    }
-
-    // Mapeia os ativos de ações por setor
-    Map<String, double> sectorMap = {};
-    stockAssets.forEach((asset) {
-      sectorMap.update(asset.segment, (value) => value + asset.totalAmount,
-          ifAbsent: () => asset.totalAmount);
-    });
-
-    // Calcula o valor total dos ativos de ações
-    double totalStockValue =
-        stockAssets.fold(0, (total, asset) => total + asset.totalAmount);
-
-    // Converte o mapa em uma lista de Setor
-    List<PieChartSectionData> sectors = sectorMap.entries
-        .map(
-          (entry) => PieChartSectionData(
-            color: _getColor(sectorMap.keys.toList().indexOf(entry.key)),
-            value: entry.value,
-            title:
-                '${(entry.value / totalStockValue * 100).toStringAsFixed(2)}%',
-            radius: 80,
-            titleStyle: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: const Color(0xffffffff),
-            ),
-            titlePositionPercentageOffset: 0.5,
-          ),
-        )
-        .toList();
-
-    // Constrói o gráfico de distribuição por setor
-    return Container(
-      height: 377, // Ajuste conforme necessário
-      child: Column(
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Text(
-              'Posição Atual por Setor',
-              style: TextStyle(
-                fontSize: 16.0,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          Container(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: _buildSectorNameWidgets(sectorMap.keys.toList()),
-              ),
-            ),
-          ),
-          Container(
-            height: 300,
-            child: PieChart(
-              PieChartData(
-                pieTouchData: PieTouchData(
-                  touchCallback: (FlTouchEvent event, pieTouchResponse) {
-                    setState(() {
-                      if (!event.isInterestedForInteractions ||
-                          pieTouchResponse == null ||
-                          pieTouchResponse.touchedSection == null) {
-                        touchedIndex = -1;
-                        return;
-                      }
-                      touchedIndex =
-                          pieTouchResponse.touchedSection!.touchedSectionIndex;
-                    });
-                  },
-                ),
-                borderData: FlBorderData(
-                  show: false,
-                ),
-                sectionsSpace: 5,
-                centerSpaceRadius: 50,
-                sections: _getTouchedSections(sectors),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  List<PieChartSectionData> _getTouchedSections(
-      List<PieChartSectionData> sectors) {
-    return sectors.map((entry) {
-      final isTouched = sectors.indexOf(entry) == touchedIndex;
-      final double fontSize = isTouched ? 20 : 14;
-      final double radius = isTouched ? 90 : 80;
-
-      return PieChartSectionData(
-        color: entry.color,
-        value: entry.value,
-        title: entry.title,
-        radius: radius,
-        titleStyle: TextStyle(
-          fontSize: fontSize,
-          fontWeight: FontWeight.bold,
-          color: const Color(0xffffffff),
-        ),
-        titlePositionPercentageOffset: isTouched ? 0.55 : 0.5,
-      );
-    }).toList();
-  }
-
-  List<Widget> _buildSectorNameWidgets(List<String> sectorNames) {
-    return sectorNames.asMap().entries.map((entry) {
-      final index = entry.key;
-      final name = entry.value;
-
-      return GestureDetector(
-        onTap: () {
-          setState(() {
-            touchedIndex = index;
-          });
-        },
-        child: Container(
-          margin: EdgeInsets.all(8.0),
-          padding: EdgeInsets.all(4.0),
-          decoration: BoxDecoration(
-            color: _getColor(index),
-            borderRadius: BorderRadius.circular(4.0),
-            border: Border.all(
-              color: touchedIndex == index ? Colors.yellow : Colors.transparent,
-              width: 2.0,
-            ),
-          ),
-          child: Text(
-            '$name',
-            style: TextStyle(
-              fontSize: 12.0,
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      );
-    }).toList();
-  }
-
-  Widget _buildRecommendationChart2(List<Asset> assets) {
-    double totalValue = assets.fold(
-        0, (total, asset) => total + asset.currentPrice * asset.quantity);
-
-    return Container(
-      height: 300,
-      child: PieChart(
-        PieChartData(
-          borderData: FlBorderData(show: false),
-          sectionsSpace: 5,
-          centerSpaceRadius: 50,
-          sections: _getRecommendationSections2(assets, totalValue),
-        ),
-      ),
-    );
-  }
-
-  List<PieChartSectionData> _getRecommendationSections2(
-      List<Asset> assets, double totalValue) {
-
-    Set<String> uniqueTypes = assets
-        .where((asset) => asset.currentPrice * asset.quantity > 0)
-        .map((asset) => asset.activeType)
-        .toSet();
-
-    double idealPercentage = 100.0 / uniqueTypes.length;
-
-    List<PieChartSectionData> sections = [];
-    uniqueTypes.forEach((type) {
-      String friendlyLabel = _getFriendlyLabel(type);
-      Color dynamicColor = _getColor(sections.length);
-
-      sections.add(
-        PieChartSectionData(
-          color: dynamicColor,
-          value: idealPercentage,
-          title: '$friendlyLabel\n${idealPercentage.toStringAsFixed(2)}%',
-          radius: 80,
-          titleStyle: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Color(0xffffffff),
-          ),
-          titlePositionPercentageOffset: 0.5,
-        ),
-      );
-    });
-
-    return sections;
-  }
-
-  String _getFriendlyLabel(String type) {
-    // Mapeia tipos de ativos para rótulos mais amigáveis
-    switch (type) {
-      case 'stocks':
-        return 'Ações';
-      case 'fiis':
-        return 'Fiis';
-    // Adicione outros mapeamentos conforme necessário
-      default:
-        return type;
-    }
-  }
-
-  List<PieChartSectionData> _getRecommendationSections(
-      List<Asset> assets, double equalDistribution, double totalValue) {
-    double percentageOffset = 0.5;
-
-    return List.generate(assets.length, (index) {
-      const isTouched = false;
-      const double fontSize = isTouched ? 20 : 14;
-      const double radius = isTouched ? 90 : 80;
-
-      return PieChartSectionData(
-        color: _getColor(index),
-        value: equalDistribution,
-        title:
-            '${assets[index].ticker} ${(equalDistribution / totalValue * 100).toStringAsFixed(2)}%',
-        radius: radius,
-        titleStyle: const TextStyle(
-          fontSize: fontSize,
-          fontWeight: FontWeight.bold,
-          color: Color(0xffffffff),
-        ),
-        titlePositionPercentageOffset: percentageOffset,
-      );
-    });
-  }
-
-  Widget _buildProfitabilityChart() {
-    // Simulação de dados para a rentabilidade da carteira e do CDI
-    List<Map<String, dynamic>> data = [
-      {'label': 'Out', 'carteira': -0.40, 'cdi': 1.01},
-      {'label': 'Nov', 'carteira': 6.345, 'cdi': 1.01},
-      {'label': 'Dez', 'carteira': 1.105, 'cdi': 1.01},
-      // Adicione mais pontos de dados conforme necessário
-    ];
-
-    return Scaffold(
-      body: Align(
-        alignment: Alignment.center,
-        child: SizedBox(
-          width: 400,
-          height: 300,
-          child: LineChart(
-            LineChartData(
-              gridData: FlGridData(show: false),
-              titlesData: FlTitlesData(show: false),
-              borderData: FlBorderData(show: true),
-              minX: 0,
-              maxX: data.length.toDouble() - 1,
-              minY: -1,
-              maxY: 8,
-              lineBarsData: [
-                _buildLineChartBarData(data, 'carteira', _getColor(0)),
-                _buildLineChartBarData(data, 'cdi', _getColor(1)),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  LineChartBarData _buildLineChartBarData(
-      List<Map<String, dynamic>> data, String key, Color color) {
-    return LineChartBarData(
-      spots: _getDataSpots(data, key),
-      isCurved: true,
-      colors: [color],
-      belowBarData: BarAreaData(show: false),
     );
   }
 

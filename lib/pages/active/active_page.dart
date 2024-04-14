@@ -3,6 +3,7 @@ import 'package:flutter_investment_control/models/asset_model.dart';
 import 'package:flutter_investment_control/models/transaction_model.dart';
 import 'package:flutter_investment_control/pages/active/extract/extract_page.dart';
 import 'package:flutter_investment_control/pages/active/graph/graph_page.dart';
+import 'package:flutter_investment_control/pages/home_page.dart';
 import 'package:flutter_investment_control/services/api_service.dart';
 import 'package:flutter_investment_control/services/asset_provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -60,10 +61,11 @@ class _AssetListState extends State<AssetList> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              'Minha Carteira de Ativos',
+              'Carteira de Ativos',
               style: TextStyle(
                 fontSize: 18,
                 color: Colors.white,
+                fontWeight: FontWeight.bold,
               ),
             ),
             IconButton(
@@ -812,7 +814,12 @@ class _AssetListState extends State<AssetList> {
   }
 
   void returnToHomePage(BuildContext context) {
-    Navigator.pop(context);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const HomePage(),
+      ),
+    );
   }
 
   @override
