@@ -1109,7 +1109,7 @@ class _AssetListState extends State<AssetList> {
               const SizedBox(width: 48.0),
               _bottomAction(
                   FontAwesomeIcons.chartPie, () => navigateToGraphPage(assets)),
-              _bottomAction(Icons.settings, () => navigateToGraphPage),
+              _bottomAction(FontAwesomeIcons.bars, () => navigateToGraphPage),
             ],
           ),
         ),

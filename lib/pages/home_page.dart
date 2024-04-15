@@ -186,11 +186,11 @@ class _HomePageState extends State<HomePage> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _bottomAction(
-                  FontAwesomeIcons.clockRotateLeft, navigateToWalletPage),
+                  FontAwesomeIcons.chartLine, navigateToWalletPage),
               _bottomAction(FontAwesomeIcons.wallet, navigateToWalletPage),
               const SizedBox(width: 48.0),
-              _bottomAction(FontAwesomeIcons.chartPie, navigateToWalletPage),
-              _bottomAction(Icons.settings, navigateToBtcPage),
+              _bottomAction(FontAwesomeIcons.newspaper, navigateToWalletPage),
+              _bottomAction(FontAwesomeIcons.bars, navigateToBtcPage),
             ],
           ),
         ),

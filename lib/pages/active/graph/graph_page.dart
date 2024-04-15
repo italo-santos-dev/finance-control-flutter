@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_investment_control/models/asset_model.dart';
 import 'package:flutter_investment_control/models/transaction_model.dart';
+import 'package:intl/intl.dart';
 
 class GraphPage extends StatefulWidget {
   final List<Asset> assetList;
@@ -14,71 +15,107 @@ class GraphPage extends StatefulWidget {
 
 class _GraphPageState extends State<GraphPage> {
   late int? touchedIndex = -1;
-  String currentFilter = 'all'; // Opções: 'all', 'stocks', 'fiis'
+  String currentFilter = 'type of assets'; // Opções: 'all', 'stocks', 'fiis'
 
   @override
-    Widget build(BuildContext context) {
-      return DefaultTabController(
-        length: 4, // Modificado para incluir o novo Tab
-        child: Scaffold(
-          appBar: AppBar(
-            leading: IconButton(
-              icon: Icon(Icons.arrow_back),
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              color: Colors.white, // Defina a cor desejada aqui
-            ),
-            title: const Text(
-              'Gráficos',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.white,
-              ),
-            ),
-            backgroundColor: Colors.black,
-            bottom: const TabBar(
-              tabs: [
-                // Tab(text: 'Posição'),
-                Tab(text: 'Composição'),
-                Tab(text: 'Patrimônio'),
-                Tab(text: 'Rentabilidade'),
-                Tab(text: 'Proventos'),
-              ],
-              labelColor: Colors.white,
-              indicatorColor: Colors.white,
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 4,  // Mantendo o número de Tabs original
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            color: Colors.white,
+          ),
+          title: const Text(
+            'Gráficos',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.white,
             ),
           ),
-          body: TabBarView(
-            children: [
-              _buildDistributionChart1(),
-              _buildMonthlyEvolutionChart(),
-              _buildProfitabilityChart(),
-              _buildProfitabilityChart(),
+          actions: <Widget>[
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: PopupMenuButton<String>(
+                icon: Icon(Icons.filter_list, color: Colors.white),
+                onSelected: (String value) {
+                  setState(() {
+                    currentFilter = value;
+                  });
+                },
+                itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                  const PopupMenuItem<String>(
+                    value: 'type of assets',
+                    child: Text('TYPE ASSETS'),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'all',
+                    child: Text('ALL'),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'stocks',
+                    child: Text('STOCKS'),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'fiis',
+                    child: Text('FIIS'),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'sectors',
+                    child: Text('SECTORS'),
+                  ),
+                ],
+              ),
+            )
+          ],
+          backgroundColor: Colors.black,
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Composição'),
+              Tab(text: 'Patrimônio'),
+              Tab(text: 'Rentabilidade'),
+              Tab(text: 'Proventos'),
             ],
+            labelColor: Colors.white,
+            indicatorColor: Colors.white,
           ),
         ),
-      );
-    }
+        body: TabBarView(
+          children: [
+            _buildDistributionChart1(),
+            Container(
+                alignment: Alignment.topCenter,
+                child: _buildMonthlyEvolutionChart()
+            ),            _buildProfitabilityChart(),
+            _buildProfitabilityChart(),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildDistributionChart() {
     List<Asset> filteredAssets = [];
     switch (currentFilter) {
+      case 'all': // Nova opção para visualizar a distribuição de ações e FIIs
+        filteredAssets = widget.assetList
+            .where((asset) => !asset.isFullyLiquidated)
+            .toList();
+        break;
       case 'stocks':
         filteredAssets = widget.assetList
             .where((asset) =>
-        asset.activeType == 'stocks' && !asset.isFullyLiquidated)
+                asset.activeType == 'stocks' && !asset.isFullyLiquidated)
             .toList();
         break;
       case 'fiis':
         filteredAssets = widget.assetList
             .where((asset) =>
-        asset.activeType == 'fiis' && !asset.isFullyLiquidated)
-            .toList();
-        break;
-      case 'type_of_assets':  // Nova opção para visualizar a distribuição de ações e FIIs
-        filteredAssets = widget.assetList
-            .where((asset) => !asset.isFullyLiquidated)
+                asset.activeType == 'fiis' && !asset.isFullyLiquidated)
             .toList();
         break;
       default:
@@ -91,37 +128,9 @@ class _GraphPageState extends State<GraphPage> {
   }
 
   Widget _buildDistributionChart1() {
-    List<String> filterOptions = ['type_of_assets', 'all', 'stocks', 'fiis', 'sectors'];
-
     return Scaffold(
       body: Column(
         children: [
-          Padding(
-            padding: EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: currentFilter,
-                    icon: Icon(Icons.filter_list, color: Colors.black54),
-                    onChanged: (String? newValue) {
-                      setState(() {
-                        currentFilter = newValue ?? 'all';
-                      });
-                    },
-                    items: filterOptions
-                        .map<DropdownMenuItem<String>>((String value) {
-                      return DropdownMenuItem<String>(
-                        value: value,
-                        child: Text(value.toUpperCase()),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ],
-            ),
-          ),
           Expanded(
             child: _buildDistributionChart(),
           ),
@@ -149,14 +158,16 @@ class _GraphPageState extends State<GraphPage> {
     Map<String, double> stocksMap = {};
 
     // Calcula a distribuição para o caso de 'stocks_fiis'
-    if (currentFilter == 'type_of_assets') {
+    if (currentFilter == 'type of assets') {
       for (var asset in assets) {
-        String typeKey = asset.activeType;  // 'stocks' ou 'fiis'
-        typeMap.update(typeKey, (value) => value + asset.totalAmount, ifAbsent: () => asset.totalAmount);
+        String typeKey = asset.activeType; // 'stocks' ou 'fiis'
+        typeMap.update(typeKey, (value) => value + asset.totalAmount,
+            ifAbsent: () => asset.totalAmount);
       }
       double totalValue = typeMap.values.fold(0, (sum, asset) => sum + asset);
       List<Color> colors = _getColors(typeMap.length);
-      return _buildPieChart(typeMap, totalValue, colors, "Distribuição Total por Tipo de Ativo");
+      return _buildPieChart(
+          typeMap, totalValue, colors, "Distribuição Total por Tipo de Ativo");
     }
 
     for (var asset in assets) {
@@ -309,7 +320,6 @@ class _GraphPageState extends State<GraphPage> {
     );
   }
 
-
   List<Color> _getColors(int count) {
     List<Color> palette = [
       Color(0xFF4FC3F7),
@@ -391,13 +401,11 @@ class _GraphPageState extends State<GraphPage> {
   }
 
   Widget _buildMonthlyEvolutionChart() {
-    // Filtrar os ativos não liquidados
     final List<Asset> nonLiquidatedAssets =
-        widget.assetList.where((asset) => !asset.isFullyLiquidated).toList();
+    widget.assetList.where((asset) => !asset.isFullyLiquidated).toList();
 
-    // Consolidar todas as transações dos ativos não liquidados
     final List<Transaction> allTransactions =
-        nonLiquidatedAssets.expand((asset) => asset.transactions).toList();
+    nonLiquidatedAssets.expand((asset) => asset.transactions).toList();
 
     allTransactions.sort((a, b) {
       if (a.date.year != b.date.year) {
@@ -406,66 +414,119 @@ class _GraphPageState extends State<GraphPage> {
       return a.date.month.compareTo(b.date.month);
     });
 
-// Calcular o saldo acumulado mensal
     final Map<String, double> monthlyBalances = {};
-
     for (var transaction in allTransactions) {
       final String monthYear =
-          '${transaction.date.month}-${transaction.date.year}';
-      monthlyBalances[monthYear] ??= 0;
-      monthlyBalances[monthYear] =
-          (monthlyBalances[monthYear] ?? 0) + transaction.amount;
+          '${transaction.date.month.toString().padLeft(2, '0')}-${transaction.date.year}';
+      if (transaction.amount != null) {
+        monthlyBalances[monthYear] =
+            (monthlyBalances[monthYear] ?? 0) + transaction.amount!;
+      }
     }
 
-    // Extrair meses e anos únicos para criar as barras
     final List<String> uniqueMonths = monthlyBalances.keys.toList();
-    uniqueMonths.sort(); // Ordenar para garantir a ordem correta no gráfico
+    uniqueMonths.sort();
 
-    // Criar barras para cada mês
-    final List<BarChartGroupData> barGroups = uniqueMonths.map((monthYear) {
-      return BarChartGroupData(
-        x: uniqueMonths.indexOf(monthYear) + 1,
-        barRods: [
-          BarChartRodData(
-            y: monthlyBalances[monthYear]!,
-            colors: [Colors.blue],
-            width: 8, // Largura da barra
-          ),
-        ],
-      );
+    final List<FlSpot> lineSpots = uniqueMonths.map((monthYear) {
+      final index = uniqueMonths.indexOf(monthYear);
+      return FlSpot(index.toDouble(), monthlyBalances[monthYear]!);
     }).toList();
 
-    // Construir o gráfico de barras
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: BarChart(
-        BarChartData(
-          gridData: FlGridData(show: false),
-          titlesData: FlTitlesData(
-            show: true,
-            leftTitles: SideTitles(showTitles: false),
-            rightTitles: SideTitles(showTitles: false),
-            bottomTitles: SideTitles(
-              showTitles: true,
-              getTextStyles: (context, value) => const TextStyle(
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
+    String simplifiedCurrencyFormat(double value) {
+      final currencyFormatter = NumberFormat.currency(
+          locale: 'pt_BR',
+          symbol: 'R\$',
+          decimalDigits: 1
+      );
+
+      if (value >= 1000) {
+        return currencyFormatter.format(value / 1000) + 'k';
+      }
+      return currencyFormatter.format(value);
+    }
+
+    return Container(
+      height: 300,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 16.0, top: 16.0, right: 24.0, bottom: 16.0),
+        child: LineChart(
+          LineChartData(
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              horizontalInterval: 1,
+              getDrawingHorizontalLine: (value) => FlLine(
+                color: Colors.grey[200]!,
+                strokeWidth: 0.5,
               ),
-              margin: 16,
-              rotateAngle: 45,
-              getTitles: (double value) {
-                final index = value.toInt() - 1;
-                if (index >= 0 && index < uniqueMonths.length) {
-                  return uniqueMonths[index];
-                }
-                return '';
-              },
+            ),
+            titlesData: FlTitlesData(
+              bottomTitles: SideTitles(
+                showTitles: true,
+                getTextStyles: (context, value) => const TextStyle(
+                  color: Colors.blueGrey,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+                margin: 10,
+                rotateAngle: 0,
+                getTitles: (double value) {
+                  final index = value.toInt();
+                  if (index >= 0 && index < uniqueMonths.length) {
+                    var parts = uniqueMonths[index].split('-');
+                    return '${parts[0]}/${parts[1].substring(2)}'; // Display as MM/YY
+                  }
+                  return '';
+                },
+              ),
+              leftTitles: SideTitles(
+                showTitles: true,
+                getTextStyles: (context, value) => const TextStyle(
+                  color: Colors.blueGrey,
+                  fontSize: 12,
+                ),
+                reservedSize: 40,
+                margin: 12,
+                interval: 200,
+                getTitles: (value) => simplifiedCurrencyFormat(value),
+              ),
+              topTitles: SideTitles(showTitles: false),
+              rightTitles: SideTitles(showTitles: false),
+            ),
+            borderData: FlBorderData(show: false),
+            lineBarsData: [
+              LineChartBarData(
+                spots: lineSpots,
+                isCurved: true,
+                colors: [Theme.of(context).colorScheme.secondary],
+                barWidth: 2,
+                isStrokeCapRound: true,
+                dotData: FlDotData(show: true),
+                belowBarData: BarAreaData(
+                  show: true,
+                  colors: [Theme.of(context).colorScheme.secondary.withOpacity(0.3)],
+                ),
+              ),
+            ],
+            lineTouchData: LineTouchData(
+              touchTooltipData: LineTouchTooltipData(
+                tooltipBgColor: Colors.blueGrey,
+                getTooltipItems: (List<LineBarSpot> touchedSpots) {
+                  return touchedSpots.map((touchedSpot) {
+                    final textStyle = TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    );
+                    return LineTooltipItem(
+                      simplifiedCurrencyFormat(touchedSpot.y),
+                      textStyle,
+                    );
+                  }).toList();
+                },
+              ),
             ),
           ),
-          borderData: FlBorderData(show: true),
-          groupsSpace: 16.0, // Espaçamento entre os grupos de barras
-          barGroups: barGroups,
         ),
       ),
     );
