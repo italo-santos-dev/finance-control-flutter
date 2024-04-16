@@ -20,7 +20,7 @@ class _GraphPageState extends State<GraphPage> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 4,  // Mantendo o número de Tabs original
+      length: 4, // Mantendo o número de Tabs original
       child: Scaffold(
         appBar: AppBar(
           leading: IconButton(
@@ -88,9 +88,10 @@ class _GraphPageState extends State<GraphPage> {
           children: [
             _buildDistributionChart1(),
             Container(
-                alignment: Alignment.topCenter,
-                child: _buildMonthlyEvolutionChart()
-            ),            _buildProfitabilityChart(),
+              alignment: Alignment.topCenter,
+              child: _buildMonthlyEvolutionChart(),
+            ),
+            _buildProfitabilityChart(),
             _buildProfitabilityChart(),
           ],
         ),
@@ -390,6 +391,17 @@ class _GraphPageState extends State<GraphPage> {
     );
   }
 
+  // Função auxiliar para calcular o patrimônio em uma data específica
+  double getBalanceByDate(List<Transaction> transactions, DateTime targetDate) {
+    double balance = 0.0;
+    for (var transaction in transactions) {
+      if (transaction.date.isBefore(targetDate.add(Duration(days: 1)))) {
+        balance += transaction.amount!;
+      }
+    }
+    return balance;
+  }
+
   LineChartBarData _buildLineChartBarData(
       List<Map<String, dynamic>> data, String key, Color color) {
     return LineChartBarData(
@@ -401,12 +413,15 @@ class _GraphPageState extends State<GraphPage> {
   }
 
   Widget _buildMonthlyEvolutionChart() {
+    // Filtra apenas os ativos não liquidados
     final List<Asset> nonLiquidatedAssets =
-    widget.assetList.where((asset) => !asset.isFullyLiquidated).toList();
+        widget.assetList.where((asset) => !asset.isFullyLiquidated).toList();
 
+    // Extrai todas as transações desses ativos não liquidados
     final List<Transaction> allTransactions =
-    nonLiquidatedAssets.expand((asset) => asset.transactions).toList();
+        nonLiquidatedAssets.expand((asset) => asset.transactions).toList();
 
+    // Ordenação das transações por data
     allTransactions.sort((a, b) {
       if (a.date.year != b.date.year) {
         return a.date.year.compareTo(b.date.year);
@@ -414,19 +429,34 @@ class _GraphPageState extends State<GraphPage> {
       return a.date.month.compareTo(b.date.month);
     });
 
+    // Calcula os saldos mensais acumulados usando as transações
     final Map<String, double> monthlyBalances = {};
+    double cumulativeBalance = 0; // Inicializa saldo acumulado
     for (var transaction in allTransactions) {
       final String monthYear =
           '${transaction.date.month.toString().padLeft(2, '0')}-${transaction.date.year}';
-      if (transaction.amount != null) {
-        monthlyBalances[monthYear] =
-            (monthlyBalances[monthYear] ?? 0) + transaction.amount!;
-      }
+      cumulativeBalance += transaction.amount ?? 0; // Acumula o saldo
+      monthlyBalances[monthYear] =
+          cumulativeBalance; // Atualiza o saldo para o mês
     }
 
+    // Lista de meses únicos em ordem
     final List<String> uniqueMonths = monthlyBalances.keys.toList();
-    uniqueMonths.sort();
+    uniqueMonths.sort((a, b) {
+      var partsA = a.split('-');
+      var partsB = b.split('-');
+      int yearA = int.parse(partsA[1]);
+      int yearB = int.parse(partsB[1]);
+      int monthA = int.parse(partsA[0]);
+      int monthB = int.parse(partsB[0]);
 
+      if (yearA != yearB) {
+        return yearA.compareTo(yearB);
+      }
+      return monthA.compareTo(monthB);
+    });
+
+    // Mapeia os dados para os pontos do gráfico
     final List<FlSpot> lineSpots = uniqueMonths.map((monthYear) {
       final index = uniqueMonths.indexOf(monthYear);
       return FlSpot(index.toDouble(), monthlyBalances[monthYear]!);
@@ -434,10 +464,7 @@ class _GraphPageState extends State<GraphPage> {
 
     String simplifiedCurrencyFormat(double value) {
       final currencyFormatter = NumberFormat.currency(
-          locale: 'pt_BR',
-          symbol: 'R\$',
-          decimalDigits: 1
-      );
+          locale: 'pt_BR', symbol: 'R\$', decimalDigits: 1);
 
       if (value >= 1000) {
         return currencyFormatter.format(value / 1000) + 'k';
@@ -445,91 +472,315 @@ class _GraphPageState extends State<GraphPage> {
       return currencyFormatter.format(value);
     }
 
-    return Container(
-      height: 300,
-      child: Padding(
-        padding: const EdgeInsets.only(left: 16.0, top: 16.0, right: 24.0, bottom: 16.0),
-        child: LineChart(
-          LineChartData(
-            gridData: FlGridData(
-              show: true,
-              drawVerticalLine: false,
-              horizontalInterval: 1,
-              getDrawingHorizontalLine: (value) => FlLine(
-                color: Colors.grey[200]!,
-                strokeWidth: 0.5,
-              ),
-            ),
-            titlesData: FlTitlesData(
-              bottomTitles: SideTitles(
-                showTitles: true,
-                getTextStyles: (context, value) => const TextStyle(
-                  color: Colors.blueGrey,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-                margin: 10,
-                rotateAngle: 0,
-                getTitles: (double value) {
-                  final index = value.toInt();
-                  if (index >= 0 && index < uniqueMonths.length) {
-                    var parts = uniqueMonths[index].split('-');
-                    return '${parts[0]}/${parts[1].substring(2)}'; // Display as MM/YY
-                  }
-                  return '';
-                },
-              ),
-              leftTitles: SideTitles(
-                showTitles: true,
-                getTextStyles: (context, value) => const TextStyle(
-                  color: Colors.blueGrey,
-                  fontSize: 12,
-                ),
-                reservedSize: 40,
-                margin: 12,
-                interval: 200,
-                getTitles: (value) => simplifiedCurrencyFormat(value),
-              ),
-              topTitles: SideTitles(showTitles: false),
-              rightTitles: SideTitles(showTitles: false),
-            ),
-            borderData: FlBorderData(show: false),
-            lineBarsData: [
-              LineChartBarData(
-                spots: lineSpots,
-                isCurved: true,
-                colors: [Theme.of(context).colorScheme.secondary],
-                barWidth: 2,
-                isStrokeCapRound: true,
-                dotData: FlDotData(show: true),
-                belowBarData: BarAreaData(
-                  show: true,
-                  colors: [Theme.of(context).colorScheme.secondary.withOpacity(0.3)],
-                ),
-              ),
-            ],
-            lineTouchData: LineTouchData(
-              touchTooltipData: LineTouchTooltipData(
-                tooltipBgColor: Colors.blueGrey,
-                getTooltipItems: (List<LineBarSpot> touchedSpots) {
-                  return touchedSpots.map((touchedSpot) {
-                    final textStyle = TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    );
-                    return LineTooltipItem(
-                      simplifiedCurrencyFormat(touchedSpot.y),
-                      textStyle,
-                    );
-                  }).toList();
-                },
+    // Data de hoje
+    DateTime today = DateTime.now();
+
+    double currentBalance = getBalanceByDate(allTransactions, today);
+
+    // Encontrar datas anteriores válidas para cálculo do patrimônio
+    DateTime date6MonthsAgo =
+        findValidPreviousDate(allTransactions, today, 180);
+    DateTime date12MonthsAgo =
+        findValidPreviousDate(allTransactions, today, 365);
+    DateTime date24MonthsAgo =
+        findValidPreviousDate(allTransactions, today, 730);
+
+    // Calcular o patrimônio nessas datas
+    double balance6MonthsAgo =
+        getBalanceByDate(allTransactions, date6MonthsAgo);
+    double balance12MonthsAgo =
+        getBalanceByDate(allTransactions, date12MonthsAgo);
+    double balance24MonthsAgo =
+        getBalanceByDate(allTransactions, date24MonthsAgo);
+
+    // Calcular crescimento percentual usando a função auxiliar
+    double growth6Months = calculateGrowth(currentBalance, balance6MonthsAgo);
+    double growth12Months = calculateGrowth(currentBalance, balance12MonthsAgo);
+    double growth24Months = calculateGrowth(currentBalance, balance24MonthsAgo);
+
+    // Formatar valores para exibição
+    NumberFormat currencyFormat =
+        NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
+
+
+    final Map<String, double> categoryTotals =
+    calculateTotalByCategory(nonLiquidatedAssets);
+
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+            child: Text(
+              "Evolução do Patrimônio",
+              style: TextStyle(
+                fontSize: 16.0,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
               ),
             ),
           ),
-        ),
+          Container(
+            height: 300,
+            child: Padding(
+              padding: const EdgeInsets.only(
+                left: 16.0,
+                right: 24.0,
+              ),
+              child: LineChart(
+                LineChartData(
+                  gridData: FlGridData(
+                    show: false,
+                    drawVerticalLine: false,
+                    horizontalInterval: 1,
+                    getDrawingHorizontalLine: (value) => FlLine(
+                      color: Colors.grey[200]!,
+                      strokeWidth: 0.5,
+                    ),
+                  ),
+                  titlesData: FlTitlesData(
+                    bottomTitles: SideTitles(
+                      showTitles: true,
+                      getTextStyles: (context, value) => const TextStyle(
+                        color: Colors.blueGrey,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                      margin: 10,
+                      rotateAngle: 0,
+                      getTitles: (double value) {
+                        final index = value.toInt();
+                        if (index >= 0 && index < uniqueMonths.length) {
+                          var parts = uniqueMonths[index].split('-');
+                          return '${parts[0]}/${parts[1].substring(2)}'; // Display as MM/YY
+                        }
+                        return '';
+                      },
+                    ),
+                    leftTitles: SideTitles(
+                      showTitles: true,
+                      getTextStyles: (context, value) => const TextStyle(
+                        color: Colors.blueGrey,
+                        fontSize: 12,
+                      ),
+                      reservedSize: 40,
+                      margin: 12,
+                      interval: 500,
+                      getTitles: (value) => simplifiedCurrencyFormat(value),
+                    ),
+                    topTitles: SideTitles(showTitles: false),
+                    rightTitles: SideTitles(showTitles: false),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: lineSpots,
+                      isCurved: true,
+                      colors: [Theme.of(context).colorScheme.secondary],
+                      barWidth: 2,
+                      isStrokeCapRound: true,
+                      dotData: FlDotData(show: true),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        colors: [
+                          Theme.of(context)
+                              .colorScheme
+                              .secondary
+                              .withOpacity(0.3)
+                        ],
+                      ),
+                    ),
+                  ],
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      tooltipBgColor: Colors.blueGrey,
+                      getTooltipItems: (List<LineBarSpot> touchedSpots) {
+                        return touchedSpots.map((touchedSpot) {
+                          final textStyle = TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          );
+                          return LineTooltipItem(
+                            simplifiedCurrencyFormat(touchedSpot.y),
+                            textStyle,
+                          );
+                        }).toList();
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Card(
+                  color: Colors.grey[900],
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  elevation: 2,
+                  child: ListTile(
+                    leading:
+                        Icon(Icons.account_balance_wallet, color: Colors.grey),
+                    title: Text(
+                      'Valor Aplicado',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontSize: 16.0),
+                    ),
+                    subtitle: Text(
+                      '${currencyFormat.format(currentBalance)}',
+                      style: TextStyle(fontSize: 16, color: Colors.white70),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 10),
+                Card(
+                  color: Colors.grey[900],
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  elevation: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Crescimento Patrimonial',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Colors.white,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Row(
+                          children: [
+                            _buildGrowthTile('6 MESES', growth6Months),
+                            _buildGrowthTile('12 MESES', growth12Months),
+                            _buildGrowthTile('24 MESES', growth24Months),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            "Patrimônio Total por Categoria",
+            style: TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Container(
+              height: 300, // Specify a height for the container
+              child: buildCategoryTotals(categoryTotals),
+            ),
+          )
+        ],
       ),
     );
+  }
+
+  Map<String, double> calculateTotalByCategory(List<Asset> assets) {
+    Map<String, double> categoryTotals = {};
+    for (Asset asset in assets) {
+      double total = asset.transactions
+          .fold(0, (sum, transaction) => sum + (transaction.amount ?? 0));
+      String key = asset.activeType ??
+          "Unknown"; // Assuming a default category "Unknown" for null types
+
+      // Here we ensure that categoryTotals[key] returns a non-null value using ?? 0
+      categoryTotals[key] = (categoryTotals[key] ?? 0) + total;
+    }
+    return categoryTotals;
+  }
+
+  Widget buildCategoryTotals(Map<String, double> categoryTotals) {
+
+    // Formatar valores para exibição
+    NumberFormat currencyFormat =
+    NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
+
+    // Generate DataRow list from the map entries
+    List<DataRow> rows = categoryTotals.entries.map((entry) {
+      return DataRow(cells: [
+        DataCell(SizedBox(width: 200, child: Text(entry.key, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)))),
+        DataCell(SizedBox(width: 200, child: Text(currencyFormat.format(entry.value), style: TextStyle(fontSize: 16, color: Colors.white)))),
+      ]);
+    }).toList();
+
+    // Return DataTable widget wrapped in SingleChildScrollView to ensure scrolling
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal, // Use vertical if you prefer
+      child: DataTable(
+        columnSpacing: 48.0,
+        headingRowHeight: 56.0,
+        dataRowHeight: 48.0,
+        headingRowColor: MaterialStateProperty.resolveWith<Color>((Set<MaterialState> states) {
+          return Colors.grey[900] ?? Colors.black; // Ensure non-null value
+        }),
+        dataRowColor: MaterialStateProperty.resolveWith<Color>((Set<MaterialState> states) {
+          return Colors.grey[850] ?? Colors.black; // Slightly lighter for data rows
+        }),
+        columns: [
+          DataColumn(label: Text('Category', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white))),
+          DataColumn(label: Text('Total', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white))),
+        ],
+        rows: rows,
+        border: TableBorder.all(color: Colors.grey[200] ?? Colors.grey, width: 1.5),
+      ),
+    );
+  }
+
+  Widget _buildGrowthTile(String period, double growth) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(period, style: TextStyle(color: Colors.grey[500], fontSize: 14)),
+          SizedBox(height: 4),
+          Text(
+            '${growth.toStringAsFixed(2)} %',
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: growth >= 0 ? Colors.green : Colors.red),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Função auxiliar para calcular o crescimento percentual
+  double calculateGrowth(double currentBalance, double previousBalance) {
+    if (previousBalance == 0) {
+      if (currentBalance == 0) {
+        return 0.0; // Se ambos são zero, considera-se estabilidade (sem crescimento)
+      }
+      return double
+          .infinity; // Se o saldo anterior é zero e o atual não, indica crescimento infinito
+    }
+    return ((currentBalance - previousBalance) / previousBalance) * 100;
+  }
+
+// Função para encontrar uma data anterior válida com saldo não-zero
+  DateTime findValidPreviousDate(
+      List<Transaction> transactions, DateTime startDate, int daysBack) {
+    DateTime targetDate = startDate.subtract(Duration(days: daysBack));
+    while (getBalanceByDate(transactions, targetDate) == 0 &&
+        targetDate.isBefore(startDate)) {
+      targetDate = targetDate.add(Duration(
+          days: 1)); // Move um dia para frente até encontrar um saldo não-zero
+    }
+    return targetDate;
   }
 
   List<FlSpot> _getDataSpots(List<Map<String, dynamic>> data, String key) {
