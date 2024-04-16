@@ -4,8 +4,11 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_investment_control/models/active_model.dart';
 import 'package:flutter_investment_control/services/api_stock_indicators.dart';
+import 'package:flutter_investment_control/services/api_stocks_dividends.dart';
 import 'package:flutter_investment_control/services/api_stocks_historicals.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_svg/svg.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
 
 class ActiveDetailsPage extends StatefulWidget {
   final Active active;
@@ -18,6 +21,11 @@ class ActiveDetailsPage extends StatefulWidget {
 
 class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
   NumberFormat real = NumberFormat.currency(locale: 'pt-br', name: 'R\$');
+
+  Map<String, dynamic>? _stockIndicators;
+  List<Map<String, dynamic>> dividendDataList = [];
+  List<int> availableYears = [];
+  int selectedYear = DateTime.now().year;
 
   double _calculateFairValue() {
     if (_stockIndicators == null || _stockIndicators!['indicators'] == null) {
@@ -34,16 +42,16 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
 
     // Encontra os indicadores necessários na lista
     final Map<String, dynamic> earningsPerShareIndicator =
-    indicators.firstWhere(
-          (indicator) => indicator.containsKey('earningsPerShare'),
+        indicators.firstWhere(
+      (indicator) => indicator.containsKey('earningsPerShare'),
       orElse: () => <String, dynamic>{
         'earningsPerShare': {'value': 0.0}
       }, // Retorna um mapa com valor padrão se não encontrar
     );
 
     final Map<String, dynamic> bookValuePerShareIndicator =
-    indicators.firstWhere(
-          (indicator) => indicator.containsKey('bookValuePerShare'),
+        indicators.firstWhere(
+      (indicator) => indicator.containsKey('bookValuePerShare'),
       orElse: () => <String, dynamic>{
         'bookValuePerShare': {'value': 0.0}
       }, // Retorna um mapa com valor padrão se não encontrar
@@ -63,16 +71,15 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
   @override
   void initState() {
     super.initState();
-    _fetchStockIndicators(); // Chama a função para buscar os indicadores ao iniciar a página
+    _fetchStockIndicators();
+    fetchData();
   }
-
-  Map<String, dynamic>? _stockIndicators;
 
   Future<List<double>> _calculateReturns() async {
     try {
       // Get historical prices from the API response
       final response =
-      await StocksHistoricals().getStockHistoricals(widget.active.symbol);
+          await StocksHistoricals().getStockHistoricals(widget.active.symbol);
 
       if (response != null) {
         List<dynamic> historicals = response['historicals'] as List<dynamic>;
@@ -84,11 +91,11 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
         // Filtrar os preços para o último d
         List<double> pricesLastMonth = historicals
             .where((historical) {
-          DateTime date = DateTime.parse(historical['date']);
-          return date.isAfter(
-              firstDayOfLastMonth.subtract(Duration(days: 1))) &&
-              date.isBefore(now);
-        })
+              DateTime date = DateTime.parse(historical['date']);
+              return date.isAfter(
+                      firstDayOfLastMonth.subtract(Duration(days: 1))) &&
+                  date.isBefore(now);
+            })
             .map<double>(
                 (historical) => double.parse(historical['close'].toString()))
             .toList();
@@ -102,7 +109,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
 
           // Calcular a rentabilidade para o último mês
           returnLastMonth = ((lastDayClosingPrice - firstDayClosingPrice) /
-              firstDayClosingPrice) *
+                  firstDayClosingPrice) *
               100;
         }
 
@@ -110,9 +117,9 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
         DateTime twelveMonthsAgo = DateTime.now().subtract(Duration(days: 365));
         List<double> pricesLast12Months = historicals
             .where((historical) {
-          DateTime date = DateTime.parse(historical['date']);
-          return date.isAfter(twelveMonthsAgo.subtract(Duration(days: 1)));
-        })
+              DateTime date = DateTime.parse(historical['date']);
+              return date.isAfter(twelveMonthsAgo.subtract(Duration(days: 1)));
+            })
             .map<double>(
                 (historical) => double.parse(historical['close'].toString()))
             .toList();
@@ -126,7 +133,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
           // Calcular a rentabilidade dos últimos 12 meses
           returnLast12Months =
               ((lastPriceLast12Months - firstPriceLast12Months) /
-                  firstPriceLast12Months) *
+                      firstPriceLast12Months) *
                   100;
         }
 
@@ -144,7 +151,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
     try {
       // Chama a função para obter os indicadores da API
       final indicators =
-      await StockIndicators().getStockIndicators(widget.active.symbol);
+          await StockIndicators().getStockIndicators(widget.active.symbol);
       setState(() {
         _stockIndicators = indicators;
       });
@@ -152,6 +159,25 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
       print('Error fetching stock indicators: $e');
       // Trate o erro conforme necessário
     }
+  }
+
+  void fetchData() async {
+    StockDividends stockDividends = StockDividends();
+    List<Map<String, dynamic>> data =
+        await stockDividends.getStockDividends(widget.active.symbol);
+    setState(() {
+      if (data != null) {
+        dividendDataList = data;
+        availableYears = data
+            .where((dividend) => dividend['date'] != null)
+            .map((dividend) => DateTime.parse(dividend['date']).year)
+            .toSet()
+            .toList();
+      } else {
+        // Handle the case where data is null
+        // For example, show an error message or retry fetching data
+      }
+    });
   }
 
   @override
@@ -211,7 +237,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
                         icon: Icons.trending_up,
                         title: 'Dividend Yield',
                         value:
-                        '${widget.active.dividendYield.toStringAsFixed(2)}%',
+                            '${widget.active.dividendYield.toStringAsFixed(2)}%',
                       ),
                       _buildGeneralInfoRow(
                         icon: Icons.business,
@@ -241,10 +267,15 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
                       ),
                     ],
                   ),
-                  // Add more sections as needed
                   _buildIndicatorsSection(),
                   const SizedBox(height: 15),
-                  _buildFairValueSection(), // Substitua esta linha
+                  _buildFairValueSection(),
+                  const SizedBox(height: 15),
+                  _buildStockDividends(),
+                  const SizedBox(
+                    height: 15,
+                  ),
+                  _buildPriceCeilingSection(),
                 ],
               ),
             ),
@@ -281,8 +312,8 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
         maxX: values.length.toDouble() - 1,
         minY: 0,
         maxY: values
-            .reduce((curr, next) => curr > next ? curr : next)
-            .toDouble() +
+                .reduce((curr, next) => curr > next ? curr : next)
+                .toDouble() +
             10,
       ),
     );
@@ -341,50 +372,67 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
   }
 
   Widget _buildHeader(double returnLast12Months, double returnCurrentMonth) {
-    return Row(
-      children: <Widget>[
-        Container(
-          width: 100,
-          height: 100,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            image: DecorationImage(
-              image: AssetImage(widget.active.icon),
-              fit: BoxFit.cover,
+    return Container(
+      padding: EdgeInsets.all(16),
+      child: Row(
+        children: <Widget>[
+          _buildAvatar(),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.active.name,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    // color: Colors.white
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Rentabilidade (12M): ${returnLast12Months.toStringAsFixed(2)}%',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                Text(
+                  'Último Mês: ${returnCurrentMonth.toStringAsFixed(2)}%',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.active.name,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Rentabilidade (12M): ${returnLast12Months.toStringAsFixed(2)}%',
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
-                ),
-              ),
-              Text(
-                'Último Mês: ${returnCurrentMonth.toStringAsFixed(2)}%',
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvatar() {
+    Widget avatar;
+    if (widget.active.icon.toLowerCase().endsWith('.svg')) {
+      avatar = SvgPicture.network(
+        widget.active.icon,
+        headers: {'Accept': 'image/svg+xml'},
+        width: 80,
+        height: 80,
+      );
+    } else {
+      avatar = Image.asset(
+        widget.active.icon,
+        width: 80,
+        height: 80,
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: avatar,
     );
   }
 
@@ -416,7 +464,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
   Widget _buildGeneralInfoRow(
       {required IconData icon, required String title, required String value}) {
     return Padding(
-      padding: const EdgeInsets.only(left: 8.0, bottom: 8.0),
+      padding: const EdgeInsets.only(left: 10.0, bottom: 8.0),
       child: Row(
         children: [
           Icon(icon),
@@ -449,7 +497,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
   Widget _buildPerformanceInfoRow(
       {required IconData icon, required String title, required String value}) {
     return Padding(
-      padding: const EdgeInsets.only(left: 8.0, bottom: 18.0),
+      padding: const EdgeInsets.only(left: 10.0, bottom: 18.0),
       child: Row(
         children: [
           Icon(icon),
@@ -491,7 +539,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
     }
 
     final List<Map<String, dynamic>> indicators =
-    indicatorsDynamic.cast<Map<String, dynamic>>();
+        indicatorsDynamic.cast<Map<String, dynamic>>();
 
     final Map<String, List<String>> sectionKeys = {
       'Indicadores de Valuation': [
@@ -540,7 +588,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
           children: [
             Padding(
               padding:
-              const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+                  const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
               child: Text(
                 sectionTitle,
                 style: const TextStyle(
@@ -565,7 +613,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Indicadores', // Adicione um título para a seção de indicadores
+            'Indicadores',
             style: TextStyle(
               fontSize: 16.0,
               fontWeight: FontWeight.bold,
@@ -579,13 +627,13 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
 
   Widget _buildIndicatorCard(
       {required String name,
-        required String description,
-        required IconData infoIcon,
-        required IconData historyIcon,
-        required String value}) { // Adicionando o parâmetro value
+      required String description,
+      required IconData infoIcon,
+      required IconData historyIcon,
+      required String value}) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 4.0),
-      width: MediaQuery.of(context).size.width / 2 - 24, // Defina um tamanho máximo
+      width: MediaQuery.of(context).size.width / 2 - 24,
       child: Card(
         elevation: 2,
         color: Colors.grey[900],
@@ -609,12 +657,12 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
                         color: Colors.white,
                       ),
                     ),
-                    const SizedBox(height: 4), // Adicionando espaço entre description e value
+                    const SizedBox(height: 4),
                     Text(
                       value,
                       style: const TextStyle(
                         fontSize: 14,
-                        color: Colors.white, // Altere a cor conforme necessário
+                        color: Colors.white,
                       ),
                     ),
                   ],
@@ -650,7 +698,6 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
       ),
     );
   }
-
 
   List<Widget> _buildIndicatorCards(
       List<Map<String, dynamic>> indicators, List<String> keys) {
@@ -732,9 +779,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
                   formattedFairValue,
                   style: TextStyle(
                     fontSize: 14,
-                    color: fairValue > currentPrice
-                        ? Colors.green
-                        : Colors.red,
+                    color: fairValue > currentPrice ? Colors.green : Colors.red,
                   ),
                 ),
               ],
@@ -755,9 +800,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
                   '${potentialReturn.toStringAsFixed(2)}%',
                   style: TextStyle(
                     fontSize: 14,
-                    color: fairValue > currentPrice
-                        ? Colors.green
-                        : Colors.red,
+                    color: fairValue > currentPrice ? Colors.green : Colors.red,
                   ),
                 ),
               ],
@@ -767,4 +810,360 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
       ],
     );
   }
+
+  Widget _buildStockDividends() {
+    List<int> yearsWithInfo =
+        availableYears.where((year) => _hasDataForYear(year)).toList();
+    int? selectedYearToShow = selectedYear;
+
+    if (!yearsWithInfo.contains(selectedYear)) {
+      yearsWithInfo
+          .sort();
+      selectedYearToShow = yearsWithInfo.isNotEmpty ? yearsWithInfo.last : null;
+    }
+
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Histórico de Remuneração',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            DropdownButton<int>(
+              value: selectedYearToShow,
+              onChanged: (int? value) {
+                if (value != null) {
+                  setState(() {
+                    selectedYear = value;
+                  });
+                }
+              },
+              style: TextStyle(fontSize: 16, color: Colors.black),
+              itemHeight: 48,
+              underline: Container(),
+              icon: Icon(Icons.arrow_drop_down),
+              iconSize: 32,
+              elevation: 8,
+              dropdownColor: Colors.white,
+              isDense:
+                  true,
+              items: yearsWithInfo
+                  .map<DropdownMenuItem<int>>(
+                    (int year) => DropdownMenuItem<int>(
+                      value: year,
+                      child: Container(
+                        height: 48,
+                        alignment: Alignment.center,
+                        child: Text(
+                          year.toString(),
+                          style: TextStyle(fontSize: 16, color: Colors.black),
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+        ),
+        Container(
+          height: MediaQuery.of(context).size.height * 0.5,
+          child: Padding(
+            padding: const EdgeInsets.only(right: 32),
+            child: SfCartesianChart(
+              primaryXAxis: CategoryAxis(),
+              primaryYAxis: NumericAxis(),
+              series: <ChartSeries>[
+                BarSeries<ChartData, String>(
+                  dataSource: _createChartData('Dividendos'),
+                  xValueMapper: (ChartData data, _) => data.xValue,
+                  yValueMapper: (ChartData data, _) => data.yValue,
+                  dataLabelSettings: const DataLabelSettings(
+                    isVisible: true,
+                    labelPosition: ChartDataLabelPosition.outside,
+                    textStyle: TextStyle(fontSize: 10),
+                  ),
+                  width: 0.2,
+                  isTrackVisible: true,
+                  legendItemText: 'Dividendos',
+                ),
+                BarSeries<ChartData, String>(
+                  dataSource: _createChartData('JCP'),
+                  xValueMapper: (ChartData data, _) => data.xValue,
+                  yValueMapper: (ChartData data, _) => data.yValue,
+                  dataLabelSettings: DataLabelSettings(
+                    isVisible: true,
+                    labelPosition: ChartDataLabelPosition.outside,
+                    textStyle: TextStyle(fontSize: 10),
+                  ),
+                  width: 0.2,
+                  isTrackVisible: true,
+                  legendItemText: 'JCP',
+                ),
+              ],
+              legend: Legend(
+                isVisible: true,
+                position: LegendPosition.bottom,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  bool _hasDataForYear(int year) {
+    return dividendDataList.any((data) {
+      final dateStr = data['date'] as String;
+      final date = DateTime.tryParse(dateStr);
+      return date != null && date.year == year;
+    });
+  }
+
+  List<ChartData> _createChartData(String dataType) {
+    // print('Erro ao obter detalhes do ativo: $dividendDataList');
+
+    List<Map<String, dynamic>> filteredData = dividendDataList
+        .where((element) => element['date'] != null)
+        .where((element) {
+      final dateStr = element['date'] as String;
+      final date = DateTime.tryParse(dateStr);
+      return date != null && date.year == selectedYear;
+    }).toList();
+
+    // Check if there are no dividends in the selected year
+    if (filteredData.isEmpty && availableYears.isNotEmpty) {
+      // Set selectedYear to the most recent year
+      selectedYear = availableYears.first;
+      // Filter data again with the most recent year
+      filteredData = dividendDataList
+          .where((element) => element['date'] != null)
+          .where((element) {
+        final dateStr = element['date'] as String;
+        final date = DateTime.tryParse(dateStr);
+        return date != null && date.year == selectedYear;
+      }).toList();
+    }
+
+    List<ChartData> chartDataList = [];
+    for (var i = 0; i < filteredData.length; i++) {
+      if (dataType == 'Dividendos') {
+        if (filteredData[i]['type'] == 'Dividendo') {
+          chartDataList.add(ChartData(
+            xValue:
+                _getMonthName(DateTime.parse(filteredData[i]['date']).month),
+            yValue: double.parse(filteredData[i]['value'].toString()),
+          ));
+        }
+      } else if (dataType == 'JCP') {
+        if (filteredData[i]['type'] == 'JCP') {
+          chartDataList.add(ChartData(
+            xValue:
+                _getMonthName(DateTime.parse(filteredData[i]['date']).month),
+            yValue: double.parse(filteredData[i]['value'].toString()),
+          ));
+        }
+      }
+    }
+
+    return chartDataList;
+  }
+
+  String _getMonthName(int month) {
+    switch (month) {
+      case 1:
+        return 'Jan';
+      case 2:
+        return 'Feb';
+      case 3:
+        return 'Mar';
+      case 4:
+        return 'Apr';
+      case 5:
+        return 'May';
+      case 6:
+        return 'Jun';
+      case 7:
+        return 'Jul';
+      case 8:
+        return 'Aug';
+      case 9:
+        return 'Sep';
+      case 10:
+        return 'Oct';
+      case 11:
+        return 'Nov';
+      case 12:
+        return 'Dec';
+      default:
+        return 'Unknown Month';
+    }
+  }
+
+  Widget _buildPriceCeilingSection() {
+    double priceCeiling = calculatePriceCeiling(dividendDataList);
+    String formattedPriceCeiling = real.format(priceCeiling);
+
+    double currentPrice = widget.active.lastPrice;
+    double potentialReturn = ((priceCeiling - currentPrice) / currentPrice) * 100;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: () {
+            _showPriceCeilingDescription("Valor Intrínseco");
+          },
+          child: const Row(
+            children: [
+              Text(
+                'Preço Teto pelo Método Barzim de Dividendos',
+                style: TextStyle(
+                  fontSize: 16.0,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.only(left: 60),
+                child: Icon(Icons.info_outline, color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Preço Justo',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  formattedPriceCeiling,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: priceCeiling > currentPrice ? Colors.green : Colors.red,
+                  ),
+                ),
+              ],
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Potencial de Retorno',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  '${potentialReturn.toStringAsFixed(2)}%',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: priceCeiling > currentPrice ? Colors.green : Colors.red,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  double calculatePriceCeiling(List<Map<String, dynamic>> dividends) {
+    double dividendYieldDesired =
+        0.06;
+
+    print('calculatePriceCeiling dividends: $dividends');
+
+    double annualDividend =
+    getAverageDividend(dividends);
+
+    double priceCeiling = annualDividend / dividendYieldDesired;
+    return priceCeiling;
+  }
+
+  double getAverageDividend(List<Map<String, dynamic>> dividends) {
+    int currentYear = DateTime.now().year;
+
+    List<Map<String, dynamic>> dividendsLastFiveYears = dividends.where((dividend) {
+      DateTime date = DateTime.parse(dividend['date']);
+      return date.year >= currentYear - 5;
+    }).toList();
+
+    print('dividendsLastFiveYears: $dividendsLastFiveYears');
+
+    double totalDividends = 0.0;
+    for (var dividend in dividendsLastFiveYears) {
+      totalDividends += dividend['value'];
+    }
+
+    print('totalDividends: ${dividendsLastFiveYears.length}');
+
+    double averageDividend = totalDividends / 5;
+
+    print('averageDividend: $averageDividend');
+
+    return averageDividend;
+  }
+
+  void _showPriceCeilingDescription(String name) {
+    String calculationDescription =
+    '''O preço teto é calculado utilizando o Método Barzim de Dividendos. Este método envolve calcular a média dos dividendos dos últimos 5 anos e usar um Dividend Yield desejado como base para determinar o preço teto. 
+    
+  Dividend Yield Desejado: 6%
+  Média dos Dividendos dos Últimos 5 Anos: \$ ${getAverageDividend(dividendDataList).toStringAsFixed(2)}
+    
+  Preço Teto = Média dos Dividendos / Dividend Yield Desejado
+  Preço Teto = \$ ${(calculatePriceCeiling(dividendDataList)).toStringAsFixed(2)}
+  ''';
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return Container(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                name,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+              SizedBox(height: 10),
+              Text(
+                calculationDescription,
+                style: TextStyle(
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class ChartData {
+  final String xValue;
+  final double yValue;
+
+  ChartData({required this.xValue, required this.yValue});
 }

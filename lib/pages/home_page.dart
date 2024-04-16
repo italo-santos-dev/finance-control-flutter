@@ -7,11 +7,13 @@ import 'package:flutter_investment_control/pages/active/details/active_details_p
 import 'package:flutter_investment_control/pages/active/active_page.dart';
 import 'package:flutter_investment_control/services/api_brapi_get_logo.dart';
 import 'package:flutter_investment_control/services/api_stocks_ibovespa.dart';
+import 'package:flutter_investment_control/widgets/adverts/adverts_widget.dart';
 import 'package:flutter_investment_control/widgets/btc/bitcoin_card_widget.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -58,6 +60,8 @@ class _HomePageState extends State<HomePage> {
   ApiBrapiGetLogo apiBrapi = ApiBrapiGetLogo();
   List<Active> stockIndicators = [];
 
+  InterstitialAd? _interstitialAd;
+
   final PageController _controller = PageController();
   int _currentPage = 0;
 
@@ -65,6 +69,7 @@ class _HomePageState extends State<HomePage> {
 
   late Timer _timer;
   bool isLoading = true;
+  bool isDispose = false;
 
   @override
   void initState() {
@@ -80,6 +85,7 @@ class _HomePageState extends State<HomePage> {
         duration: Duration(milliseconds: 500),
         curve: Curves.easeInOut,
       );
+      _createInterstitialAd();
     });
     fetchData();
   }
@@ -180,11 +186,11 @@ class _HomePageState extends State<HomePage> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _bottomAction(
-                  FontAwesomeIcons.clockRotateLeft, navigateToWalletPage),
-              _bottomAction(FontAwesomeIcons.chartPie, navigateToWalletPage),
-              const SizedBox(width: 48.0),
+                  FontAwesomeIcons.chartLine, navigateToWalletPage),
               _bottomAction(FontAwesomeIcons.wallet, navigateToWalletPage),
-              _bottomAction(Icons.settings, navigateToBtcPage),
+              const SizedBox(width: 48.0),
+              _bottomAction(FontAwesomeIcons.newspaper, navigateToWalletPage),
+              _bottomAction(FontAwesomeIcons.bars, navigateToBtcPage),
             ],
           ),
         ),
@@ -393,8 +399,8 @@ class _HomePageState extends State<HomePage> {
                                     )
                                   : SizedBox(
                                       width: 40.0,
-                                      child: _buildIcon(filteredStocks[active]
-                                          .icon),
+                                      child: _buildIcon(
+                                          filteredStocks[active].icon),
                                     ),
                               title: Text(
                                 filteredStocks[active].symbol,
@@ -418,7 +424,9 @@ class _HomePageState extends State<HomePage> {
                                           .add(filteredStocks[active]);
                                 });
                               },
-                              onTap: () => showDetails(filteredStocks[active]),
+                              onTap: () => {
+                                showDetails(filteredStocks[active]),
+                              },
                             );
                           },
                           padding: const EdgeInsets.all(16.0),
@@ -455,6 +463,7 @@ class _HomePageState extends State<HomePage> {
   AppBar appBarDynamics() {
     if (selecionadas.isEmpty) {
       return AppBar(
+        automaticallyImplyLeading: false,
         title: Row(
           children: [
             Image.asset(
@@ -483,8 +492,7 @@ class _HomePageState extends State<HomePage> {
               color: Colors.white,
               size: 16.0,
             ),
-            onPressed: () {
-            },
+            onPressed: () {},
           ),
           IconButton(
             icon: const Icon(
@@ -492,13 +500,13 @@ class _HomePageState extends State<HomePage> {
               color: Colors.white,
               size: 16.0,
             ),
-            onPressed: () {
-            },
+            onPressed: () {},
           ),
         ],
       );
     } else {
       return AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: Colors.black,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -524,20 +532,11 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  navigateToWalletPage() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const AssetList(),
-      ),
-    );
-  }
-
   navigateToBtcPage() {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => BitcoinCard(),
+        builder: (_) => DividendChart(),
       ),
     );
   }
@@ -554,5 +553,60 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+  }
+
+  void navigateToWalletPage() {
+    _showInterstitialAd(() {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const AssetList()),
+      );
+    });
+  }
+
+  void _createInterstitialAd() {
+    InterstitialAd.load(
+      adUnitId: 'ca-app-pub-3940256099942544/1033173712',
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        // Called when an ad is successfully received.
+        onAdLoaded: (ad) {
+          debugPrint('$ad loaded.');
+          // Keep a reference to the ad so you can show it later.
+          _interstitialAd = ad;
+        },
+        // Called when an ad request failed.
+        onAdFailedToLoad: (LoadAdError error) {
+          debugPrint('InterstitialAd failed to load: $error');
+        },
+      ),
+    );
+  }
+
+  void _showInterstitialAd(OnAdClosedCallback onAdClosed) {
+    if (_interstitialAd == null) {
+      print('Anúncio null');
+      return;
+    }
+
+    _interstitialAd?.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (InterstitialAd ad) {
+        print('$ad onAdDismissedFullScreenContent.');
+        ad.dispose();
+        onAdClosed();
+      },
+      onAdFailedToShowFullScreenContent: (InterstitialAd ad, AdError error) {
+        print('$ad onAdFailedToShowFullScreenContent: $error');
+        ad.dispose();
+      },
+      onAdImpression: (InterstitialAd ad) => print('$ad impression occurred.'),
+    );
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => Anuncio(onAdClosed: onAdClosed)),
+    );
+
+    _interstitialAd?.show();
   }
 }

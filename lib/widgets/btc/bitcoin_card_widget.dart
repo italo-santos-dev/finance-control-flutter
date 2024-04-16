@@ -1,133 +1,232 @@
-import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:syncfusion_flutter_charts/charts.dart';
 
-class BitcoinCard extends StatefulWidget {
-  @override
-  _BitcoinCardState createState() => _BitcoinCardState();
+class StockDividends {
+  Future<List<Map<String, dynamic>>> getStockDividends() async {
+    final String apiUrl = "https://mfinance.com.br/api/v1/stocks/dividends/SANB11";
+
+    final response = await http.get(Uri.parse(apiUrl));
+
+    if (response.statusCode == 200) {
+      final jsonData = jsonDecode(response.body) as Map<String, dynamic>;
+      final List<dynamic> dividends = jsonData['dividends'];
+
+      return List<Map<String, dynamic>>.from(dividends);
+    } else {
+      throw Exception('Failed to load stock dividends');
+    }
+  }
 }
 
-class _BitcoinCardState extends State<BitcoinCard> {
-  final PageController _controller = PageController();
-  int _currentPage = 0;
-  final List<Map<String, dynamic>> newsList = [
-    {
-      "title": "Bitcoin reaches new all-time high!",
-      "image": "https://www.cointribune.com/app/uploads/2024/02/bitcoin-proces-Australien-2.png",
-    },
-    {
-      "title": "Major companies now accepting Bitcoin as payment",
-      "image": "https://www.cointribune.com/app/uploads/2024/02/bitcoin-proces-Australien-2.png",
-    },
-    {
-      "title": "Bitcoin price analysis: Is it the right time to invest?",
-      "image": "https://www.cointribune.com/app/uploads/2024/02/bitcoin-proces-Australien-2.png",
-    },
-    {
-      "title": "Government regulations shake up the Bitcoin market",
-      "image": "https://www.cointribune.com/app/uploads/2024/02/bitcoin-proces-Australien-2.png",
-    },
-    {
-      "title": "Top 5 Bitcoin wallets for secure storage",
-      "image": "https://www.cointribune.com/app/uploads/2024/02/bitcoin-proces-Australien-2.png",
-    },
-  ];
-  late Timer _timer;
+class DividendChart extends StatefulWidget {
+  @override
+  _DividendChartState createState() => _DividendChartState();
+}
+
+class _DividendChartState extends State<DividendChart> {
+  List<Map<String, dynamic>> dividendDataList = [];
+  int selectedYear = DateTime.now().year;
+  List<int> availableYears = [];
 
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(Duration(seconds: 5), (Timer timer) {
-      if (_currentPage < newsList.length - 1) {
-        _currentPage++;
+    fetchData();
+  }
+
+  void fetchData() async {
+    StockDividends stockDividends = StockDividends();
+    List<Map<String, dynamic>> data = await stockDividends.getStockDividends();
+    setState(() {
+      if (data != null) {
+        dividendDataList = data;
+        availableYears = data
+            .where((dividend) => dividend['date'] != null)
+            .map((dividend) => DateTime.parse(dividend['date']).year)
+            .toSet()
+            .toList();
       } else {
-        _currentPage = 0;
+        // Handle the case where data is null
+        // For example, show an error message or retry fetching data
       }
-      _controller.animateToPage(
-        _currentPage,
-        duration: Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
-      );
     });
   }
 
-  @override
-  void dispose() {
-    _timer.cancel();
-    _controller.dispose();
-    super.dispose();
+  List<ChartData> _createChartData(String dataType) {
+    List<Map<String, dynamic>> filteredData = dividendDataList
+        .where((element) => element['date'] != null)
+        .where((element) {
+      final dateStr = element['date'] as String;
+      final date = DateTime.tryParse(dateStr);
+      return date != null && date.year == selectedYear;
+    }).toList();
+
+    List<ChartData> chartDataList = [];
+    for (var i = 0; i < filteredData.length; i++) {
+      if (dataType == 'Dividendos') {
+        if (filteredData[i]['type'] == 'Dividendo') {
+          chartDataList.add(ChartData(
+            xValue: _getMonthName(DateTime.parse(filteredData[i]['date']).month),
+            yValue: double.parse(filteredData[i]['value'].toString()),
+          ));
+        }
+      } else if (dataType == 'JCP') {
+        if (filteredData[i]['type'] == 'JCP') {
+          chartDataList.add(ChartData(
+            xValue: _getMonthName(DateTime.parse(filteredData[i]['date']).month),
+            yValue: double.parse(filteredData[i]['value'].toString()),
+          ));
+        }
+      }
+    }
+
+    return chartDataList;
+  }
+
+  String _getMonthName(int month) {
+    switch (month) {
+      case 1:
+        return 'Jan';
+      case 2:
+        return 'Feb';
+      case 3:
+        return 'Mar';
+      case 4:
+        return 'Apr';
+      case 5:
+        return 'May';
+      case 6:
+        return 'Jun';
+      case 7:
+        return 'Jul';
+      case 8:
+        return 'Aug';
+      case 9:
+        return 'Sep';
+      case 10:
+        return 'Oct';
+      case 11:
+        return 'Nov';
+      case 12:
+        return 'Dec';
+      default:
+        return 'Unknown Month';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Bitcoin News Carousel'),
+        title: Text('Histórico de Remuneração'),
       ),
-      body: Align(
-        alignment: Alignment.topCenter,
-        child: SizedBox(
-          height: 200,
-          child: PageView.builder(
-            controller: _controller,
-            itemCount: newsList.length,
-            itemBuilder: (context, index) {
-              return Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8.0),
-                child: Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16.0),
-                  ),
-                  child: Stack(
-                    children: [
-                      SizedBox(
-                        width: double.infinity,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16.0),
-                          child: Image.network(
-                            newsList[index]['image'],
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Center(
-                                child: Icon(Icons.error),
-                              );
-                            },
-                          ),
-                        ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 52.0, right: 16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Histórico de Remuneração',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                DropdownButton<int>(
+                  value: selectedYear,
+                  onChanged: (int? value) {
+                    if (value != null) {
+                      setState(() {
+                        selectedYear = value;
+                      });
+                    }
+                  },
+                  style: TextStyle(fontSize: 16, color: Colors.blueAccent), // Estilo do texto
+                  itemHeight: 48, // Altura do botão
+                  underline: Container(), // Remove a linha abaixo do botão
+                  icon: Icon(Icons.arrow_drop_down), // Ícone do botão dropdown
+                  iconSize: 32, // Tamanho do ícone do botão dropdown
+                  elevation: 8, // Elevação do dropdown
+                  dropdownColor: Colors.white, // Cor do dropdown
+                  items: availableYears.map<DropdownMenuItem<int>>(
+                        (int year) => DropdownMenuItem<int>(
+                      value: year,
+                      child: Text(
+                        year.toString(),
+                        style: TextStyle(fontSize: 16),
                       ),
-                      Positioned(
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.only(
-                              bottomLeft: Radius.circular(16.0),
-                              bottomRight: Radius.circular(16.0),
-                            ),
-                            color: Colors.black.withOpacity(0.6),
-                          ),
-                          padding: EdgeInsets.all(8.0),
-                          child: Text(
-                            newsList[index]['title'],
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 16.0, color: Colors.white),
-                          ),
-                        ),
+                    ),
+                  ).toList(),
+                ),
+              ],
+            ),
+          ),
+
+          Container(
+            height: MediaQuery.of(context).size.height * 0.5,
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Container(
+                padding: const EdgeInsets.all(8.0),
+                child: SfCartesianChart(
+                  primaryXAxis: CategoryAxis(),
+                  primaryYAxis: NumericAxis(),
+                  series: <ChartSeries>[
+                    BarSeries<ChartData, String>(
+                      dataSource: _createChartData('Dividendos'),
+                      xValueMapper: (ChartData data, _) => data.xValue,
+                      yValueMapper: (ChartData data, _) => data.yValue,
+                      dataLabelSettings: const DataLabelSettings(
+                        isVisible: true,
+                        labelPosition: ChartDataLabelPosition.outside,
+                        textStyle: TextStyle(fontSize: 10),
                       ),
-                    ],
+                      width: 0.2,
+                      isTrackVisible: true,
+                      legendItemText: 'Dividendos',
+                    ),
+                    BarSeries<ChartData, String>(
+                      dataSource: _createChartData('JCP'),
+                      xValueMapper: (ChartData data, _) => data.xValue,
+                      yValueMapper: (ChartData data, _) => data.yValue,
+                      dataLabelSettings: DataLabelSettings(
+                        isVisible: true,
+                        labelPosition: ChartDataLabelPosition.outside,
+                        textStyle: TextStyle(fontSize: 10),
+                      ),
+                      width: 0.2,
+                      isTrackVisible: true,
+                      legendItemText: 'JCP',
+                    ),
+                  ],
+                  legend: Legend(
+                    isVisible: true,
+                    position: LegendPosition.bottom, // Posição da legenda
                   ),
                 ),
-              );
-            },
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 }
 
+class ChartData {
+  final String xValue;
+  final double yValue;
 
+  ChartData({required this.xValue, required this.yValue});
+}
 
+void main() {
+  runApp(MaterialApp(
+    title: 'Dividend Chart Example',
+    home: DividendChart(),
+  ));
+}
 
 
