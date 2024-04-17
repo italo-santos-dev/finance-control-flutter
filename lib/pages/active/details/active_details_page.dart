@@ -3,9 +3,9 @@ import 'dart:math';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_investment_control/models/active_model.dart';
-import 'package:flutter_investment_control/services/api_stock_indicators.dart';
-import 'package:flutter_investment_control/services/api_stocks_dividends.dart';
-import 'package:flutter_investment_control/services/api_stocks_historicals.dart';
+import 'package:flutter_investment_control/services/apis/api_stock_indicators.dart';
+import 'package:flutter_investment_control/services/apis/api_stocks_dividends.dart';
+import 'package:flutter_investment_control/services/apis/api_stocks_historicals.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
@@ -79,7 +79,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
     try {
       // Get historical prices from the API response
       final response =
-          await StocksHistoricals().getStockHistoricals(widget.active.symbol);
+          await StocksHistoricals().getStockHistoricals(widget.active.symbol, 12);
 
       if (response != null) {
         List<dynamic> historicals = response['historicals'] as List<dynamic>;
@@ -251,6 +251,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
                       ),
                     ],
                   ),
+
                   const SizedBox(height: 15),
                   _buildInfoSection(
                     title: 'Desempenho Anual',

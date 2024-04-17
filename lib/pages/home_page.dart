@@ -5,10 +5,11 @@ import 'package:flutter_investment_control/core/app_icons.dart';
 import 'package:flutter_investment_control/models/active_model.dart';
 import 'package:flutter_investment_control/pages/active/details/active_details_page.dart';
 import 'package:flutter_investment_control/pages/active/active_page.dart';
-import 'package:flutter_investment_control/services/api_brapi_get_logo.dart';
-import 'package:flutter_investment_control/services/api_stocks_ibovespa.dart';
+import 'package:flutter_investment_control/services/apis/api_brapi_get_logo.dart';
+import 'package:flutter_investment_control/services/apis/api_stocks_ibovespa.dart';
 import 'package:flutter_investment_control/widgets/adverts/adverts_widget.dart';
 import 'package:flutter_investment_control/widgets/btc/bitcoin_card_widget.dart';
+import 'package:flutter_investment_control/widgets/btc/chart_page.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
@@ -536,7 +537,7 @@ class _HomePageState extends State<HomePage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => DividendChart(),
+        builder: (_) => ChartPage(ticker: 'SANB11',),
       ),
     );
   }
