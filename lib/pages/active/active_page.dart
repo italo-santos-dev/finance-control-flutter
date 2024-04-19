@@ -6,6 +6,7 @@ import 'package:flutter_investment_control/pages/active/graph/graph_page.dart';
 import 'package:flutter_investment_control/pages/home_page.dart';
 import 'package:flutter_investment_control/services/apis/api_service.dart';
 import 'package:flutter_investment_control/services/asset_provider.dart';
+import 'package:flutter_investment_control/widgets/protfolioPerformance/portfolio_performance_chart.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';

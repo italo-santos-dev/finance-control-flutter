@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_investment_control/models/asset_model.dart';
 import 'package:flutter_investment_control/models/transaction_model.dart';
+import 'package:flutter_investment_control/widgets/protfolioPerformance/portfolio_performance_chart.dart';
 import 'package:intl/intl.dart';
 
 class GraphPage extends StatefulWidget {
@@ -19,6 +20,10 @@ class _GraphPageState extends State<GraphPage> {
 
   @override
   Widget build(BuildContext context) {
+
+    final List<Asset> assetsTest = widget.assetList.toList();
+
+
     return DefaultTabController(
       length: 4, // Mantendo o número de Tabs original
       child: Scaffold(
@@ -91,7 +96,7 @@ class _GraphPageState extends State<GraphPage> {
               alignment: Alignment.topCenter,
               child: _buildMonthlyEvolutionChart(),
             ),
-            _buildProfitabilityChart(),
+            PortfolioPerformanceChart(assets: assetsTest),
             _buildProfitabilityChart(),
           ],
         ),
@@ -498,10 +503,10 @@ class _GraphPageState extends State<GraphPage> {
     double growth12Months = calculateGrowth(currentBalance, balance12MonthsAgo);
     double growth24Months = calculateGrowth(currentBalance, balance24MonthsAgo);
 
+
     // Formatar valores para exibição
     NumberFormat currencyFormat =
         NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
-
 
     final Map<String, double> categoryTotals =
     calculateTotalByCategory(nonLiquidatedAssets);
