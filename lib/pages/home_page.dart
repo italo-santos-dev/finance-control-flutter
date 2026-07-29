@@ -8,9 +8,7 @@ import 'package:flutter_investment_control/pages/active/active_page.dart';
 import 'package:flutter_investment_control/services/apis/api_brapi_get_logo.dart';
 import 'package:flutter_investment_control/services/apis/api_stocks_ibovespa.dart';
 import 'package:flutter_investment_control/widgets/adverts/adverts_widget.dart';
-import 'package:flutter_investment_control/widgets/btc/bitcoin_card_widget.dart';
 import 'package:flutter_investment_control/widgets/btc/chart_page.dart';
-import 'package:flutter_investment_control/widgets/protfolioPerformance/portfolio_performance_chart.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
@@ -73,20 +71,25 @@ class _HomePageState extends State<HomePage> {
   bool isLoading = true;
   bool isDispose = false;
 
-  @override
+@override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(Duration(seconds: 5), (Timer timer) {
+    _timer = Timer.periodic(const Duration(seconds: 5), (Timer timer) {
       if (_currentPage < newsList.length - 1) {
         _currentPage++;
       } else {
         _currentPage = 0;
       }
-      _controller.animateToPage(
-        _currentPage,
-        duration: Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
-      );
+      
+      // ADICIONADO: Trava de segurança para checar se o PageView está ativo na tela
+      if (_controller.hasClients) {
+        _controller.animateToPage(
+          _currentPage,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
+      }
+      
       _createInterstitialAd();
     });
     fetchData();
@@ -543,12 +546,12 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _bottomAction(IconData icon, VoidCallback onTap) {
+  Widget _bottomAction(FaIconData icon, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.all(8.0),
-        child: Icon(
+        child: FaIcon(
           icon,
           color: Colors.grey[900],
           size: 20.0,

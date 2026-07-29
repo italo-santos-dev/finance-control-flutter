@@ -14,7 +14,7 @@ import 'package:syncfusion_flutter_charts/charts.dart';
 class ActiveDetailsPage extends StatefulWidget {
   final Active active;
 
-  ActiveDetailsPage({Key? key, required this.active}) : super(key: key);
+  const ActiveDetailsPage({super.key, required this.active});
 
   @override
   _ActiveDetailsPageState createState() => _ActiveDetailsPageState();
@@ -127,7 +127,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
             .where((historical) {
               DateTime date = DateTime.parse(historical['date']);
               return date.isAfter(
-                      firstDayOfLastMonth.subtract(Duration(days: 1))) &&
+                      firstDayOfLastMonth.subtract(const Duration(days: 1))) &&
                   date.isBefore(now);
             })
             .map<double>(
@@ -148,11 +148,11 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
         }
 
         // Calcular a rentabilidade para os últimos 12 meses
-        DateTime twelveMonthsAgo = DateTime.now().subtract(Duration(days: 365));
+        DateTime twelveMonthsAgo = DateTime.now().subtract(const Duration(days: 365));
         List<double> pricesLast12Months = historicals
             .where((historical) {
               DateTime date = DateTime.parse(historical['date']);
-              return date.isAfter(twelveMonthsAgo.subtract(Duration(days: 1)));
+              return date.isAfter(twelveMonthsAgo.subtract(const Duration(days: 1)));
             })
             .map<double>(
                 (historical) => double.parse(historical['close'].toString()))
@@ -200,17 +200,12 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
     List<Map<String, dynamic>> data =
         await stockDividends.getStockDividends(widget.active.symbol);
     setState(() {
-      if (data != null) {
-        dividendDataList = data;
-        availableYears = data
-            .where((dividend) => dividend['date'] != null)
-            .map((dividend) => DateTime.parse(dividend['date']).year)
-            .toSet()
-            .toList();
-      } else {
-        // Handle the case where data is null
-        // For example, show an error message or retry fetching data
-      }
+      dividendDataList = data;
+      availableYears = data
+          .where((dividend) => dividend['date'] != null)
+          .map((dividend) => DateTime.parse(dividend['date']).year)
+          .toSet()
+          .toList();
     });
   }
 
@@ -304,9 +299,9 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
                   ),
                   Column(
                     children: [
-                      Align(
+                      const Align(
                         alignment: Alignment.topLeft, // Ajusta o alinhamento para direita
-                        child: const Text(
+                        child: Text(
                           'Cotação',
                           style: TextStyle(
                             fontSize: 16.0,
@@ -330,8 +325,8 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
                                   alignment: Alignment.center,
                                   child: Container(
                                     color: Colors.black54,
-                                    padding: EdgeInsets.all(8),
-                                    child: Text('Atualizando...', style: TextStyle(color: Colors.white)),
+                                    padding: const EdgeInsets.all(8),
+                                    child: const Text('Atualizando...', style: TextStyle(color: Colors.white)),
                                   ),
                                 ),
                               ],
@@ -371,8 +366,8 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
     // Criação do gráfico de linhas
     Widget chart = LineChart(
       LineChartData(
-        gridData: FlGridData(show: false),
-        titlesData: FlTitlesData(show: false),
+        gridData: const FlGridData(show: false),
+        titlesData: const FlTitlesData(show: false),
         borderData: FlBorderData(show: false),
         lineBarsData: [
           LineChartBarData(
@@ -380,10 +375,10 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
               return FlSpot(entry.key.toDouble(), entry.value);
             }).toList(),
             isCurved: true,
-            colors: [Colors.blue],
+            color: Colors.blue,
             barWidth: 4,
             isStrokeCapRound: true,
-            dotData: FlDotData(show: true),
+            dotData: const FlDotData(show: true),
             belowBarData: BarAreaData(show: false),
           ),
         ],
@@ -401,7 +396,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Histórico do Indicador'),
+        title: const Text('Histórico do Indicador'),
         content: SizedBox(
           width: MediaQuery.of(context).size.width - 100,
           height: MediaQuery.of(context).size.height - 200,
@@ -412,7 +407,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
             onPressed: () {
               Navigator.of(context).pop(); // Fecha o modal
             },
-            child: Text('Fechar'),
+            child: const Text('Fechar'),
           ),
         ],
       ),
@@ -436,10 +431,10 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
                   fontSize: 18,
                 ),
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               Text(
                 description,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 16,
                 ),
               ),
@@ -452,7 +447,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
 
   Widget _buildHeader(double returnLast12Months, double returnCurrentMonth) {
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       child: Row(
         children: <Widget>[
           _buildAvatar(),
@@ -497,7 +492,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
     if (widget.active.icon.toLowerCase().endsWith('.svg')) {
       avatar = SvgPicture.network(
         widget.active.icon,
-        headers: {'Accept': 'image/svg+xml'},
+        headers: const {'Accept': 'image/svg+xml'},
         width: 80,
         height: 80,
       );
@@ -614,7 +609,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
     final List<dynamic>? indicatorsDynamic = _stockIndicators!['indicators'];
 
     if (indicatorsDynamic == null) {
-      return SizedBox(); // Ou algum outro widget de espaço reservado
+      return const SizedBox(); // Ou algum outro widget de espaço reservado
     }
 
     final List<Map<String, dynamic>> indicators =
@@ -786,7 +781,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
       {'label': '5A', 'months': 60},
     ];
 
-    void _applyFilter(int months) {
+    void applyFilter(int months) {
       print("Filtro Aplicado: $months meses");
       setState(() {
         _chartData = _fetchChartData(months: months);
@@ -804,16 +799,16 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8), // Adiciona espaço entre os botões
               child: ElevatedButton(
-                onPressed: () => _applyFilter(filter['months']),
-                child: Text(filter['label'], style: TextStyle(color: Colors.white)),
+                onPressed: () => applyFilter(filter['months']),
                 style: ElevatedButton.styleFrom(
-                  primary: Colors.grey[850],  // dark grey button background
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  backgroundColor: Colors.grey[850],  // dark grey button background
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20), // rounded corners
                   ),
                   elevation: 3,  // subtle shadow
                 ),
+                child: Text(filter['label'], style: TextStyle(color: Colors.white)),
               ),
             );
           }).toList(),
@@ -826,38 +821,55 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
     return Container(
       height: 300, // Define a altura para metade da altura da tela
       padding:
-      EdgeInsets.only(right: 20, left: 16), // Adicionado padding à esquerda
+      const EdgeInsets.only(right: 20, left: 16), // Adicionado padding à esquerda
       child: LineChart(
         LineChartData(
-          gridData: FlGridData(show: false), // Desativa a grade
+          gridData: const FlGridData(show: false), // Desativa a grade
           titlesData: FlTitlesData(
-            bottomTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 22,
-              getTextStyles: (context, value) => const TextStyle(
-                color: Colors.blueGrey,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
+            // EIXO X (Embaixo)
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 32, // Aumentado um pouco para acomodar o espaço
+                getTitlesWidget: (double value, TitleMeta meta) {
+                  return SideTitleWidget(
+                    axisSide: meta.axisSide,
+                    space: 10, // O margin antigo agora é o space aqui
+                    child: Text(
+                      getTitleForValue(value, chartData), // Usa a função personalizada
+                      style: const TextStyle(
+                        color: Colors.blueGrey,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  );
+                },
               ),
-              getTitles: (value) {
-                return getTitleForValue(value, chartData); // Usa a função personalizada para obter títulos
-              },
-              margin: 10,
-            ),            leftTitles: SideTitles(
-            showTitles: true,
-            getTitles: (value) {
-              return formatCurrencyBRL(value); // Formatação para BRL
-            },
-            getTextStyles: (context, value) => const TextStyle(
-              color:
-              Colors.blueGrey, // Cor azul-cinza para os títulos do eixo Y
-              fontSize: 12, // Tamanho de fonte conforme sua especificação
             ),
-            reservedSize: 40, // Espaço suficiente ajustado para legibilidade
-            margin: 12,// Margem mantida
-          ),
-            rightTitles: SideTitles(showTitles: false),
-            topTitles: SideTitles(showTitles: false),
+            // EIXO Y (Esquerda)
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 52, // Aumentado para não cortar o texto do BRL
+                getTitlesWidget: (double value, TitleMeta meta) {
+                  return SideTitleWidget(
+                    axisSide: meta.axisSide,
+                    space: 12, // O margin antigo
+                    child: Text(
+                      formatCurrencyBRL(value), // Formatação para BRL
+                      style: const TextStyle(
+                        color: Colors.blueGrey,
+                        fontSize: 12,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            // Desativa os outros eixos
+            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           ),
           borderData: FlBorderData(
             show: true,
@@ -871,29 +883,29 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
             LineChartBarData(
               spots: chartData,
               isCurved: true,
-              colors: [
-                Colors.grey[900]!
-              ], // Utiliza uma lista de cores, e faz unwrap do opcional
+              color: Colors.grey[900]!, // Agora usa 'color' no singular
               barWidth: 2,
               isStrokeCapRound: true,
-              dotData: FlDotData(show: false),
+              dotData: const FlDotData(show: false),
               belowBarData: BarAreaData(show: false),
             ),
           ],
           lineTouchData: LineTouchData(
             touchTooltipData: LineTouchTooltipData(
-              tooltipBgColor: Colors.blueGrey, // Fundo do tooltip
+              // tooltipBgColor mudou para getTooltipColor
+              getTooltipColor: (LineBarSpot touchedSpot) => Colors.blueGrey, 
               tooltipPadding: const EdgeInsets.all(8),
               tooltipMargin: 5,
               getTooltipItems: (List<LineBarSpot> touchedSpots) {
                 return touchedSpots.map((touchedSpot) {
-                  final textStyle = TextStyle(
-                    color: Colors.white, // Cor do texto para branco
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  );
                   return LineTooltipItem(
-                      formatCurrencyBRL(touchedSpot.y), textStyle);
+                    formatCurrencyBRL(touchedSpot.y),
+                    const TextStyle(
+                      color: Colors.white, // Cor do texto para branco
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  );
                 }).toList();
               },
             ),
@@ -1038,7 +1050,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
+            const Text(
               'Histórico de Remuneração',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
@@ -1051,10 +1063,10 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
                   });
                 }
               },
-              style: TextStyle(fontSize: 16, color: Colors.black),
+              style: const TextStyle(fontSize: 16, color: Colors.black),
               itemHeight: 48,
               underline: Container(),
-              icon: Icon(Icons.arrow_drop_down),
+              icon: const Icon(Icons.arrow_drop_down),
               iconSize: 32,
               elevation: 8,
               dropdownColor: Colors.white,
@@ -1069,7 +1081,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
                         alignment: Alignment.center,
                         child: Text(
                           year.toString(),
-                          style: TextStyle(fontSize: 16, color: Colors.black),
+                          style: const TextStyle(fontSize: 16, color: Colors.black),
                         ),
                       ),
                     ),
@@ -1078,14 +1090,15 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
             ),
           ],
         ),
-        Container(
+        SizedBox(
           height: MediaQuery.of(context).size.height * 0.5,
           child: Padding(
             padding: const EdgeInsets.only(right: 32),
             child: SfCartesianChart(
-              primaryXAxis: CategoryAxis(),
-              primaryYAxis: NumericAxis(),
-              series: <ChartSeries>[
+              primaryXAxis: const CategoryAxis(),
+              primaryYAxis: const NumericAxis(),
+              // A MUDANÇA ESTÁ AQUI NA LINHA ABAIXO:
+              series: <CartesianSeries>[
                 BarSeries<ChartData, String>(
                   dataSource: _createChartData('Dividendos'),
                   xValueMapper: (ChartData data, _) => data.xValue,
@@ -1103,7 +1116,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
                   dataSource: _createChartData('JCP'),
                   xValueMapper: (ChartData data, _) => data.xValue,
                   yValueMapper: (ChartData data, _) => data.yValue,
-                  dataLabelSettings: DataLabelSettings(
+                  dataLabelSettings: const DataLabelSettings(
                     isVisible: true,
                     labelPosition: ChartDataLabelPosition.outside,
                     textStyle: TextStyle(fontSize: 10),
@@ -1113,7 +1126,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
                   legendItemText: 'JCP',
                 ),
               ],
-              legend: Legend(
+              legend: const Legend(
                 isVisible: true,
                 position: LegendPosition.bottom,
               ),
@@ -1357,10 +1370,10 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
                   fontSize: 18,
                 ),
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               Text(
                 calculationDescription,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 16,
                 ),
               ),

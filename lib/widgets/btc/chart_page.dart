@@ -121,7 +121,7 @@ class _ChartPageState extends State<ChartPage> {
                 onPressed: () => _applyFilter(filter['months']),
                 child: Text(filter['label'], style: TextStyle(color: Colors.white)),
                 style: ElevatedButton.styleFrom(
-                  primary: Colors.grey[850],  // dark grey button background
+                  backgroundColor: Colors.grey[850],  // dark grey button background
                   padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20), // rounded corners
@@ -143,43 +143,58 @@ class _ChartPageState extends State<ChartPage> {
     return DateFormat('MMM dd').format(date); // You can adjust the date format here
   }
 
-
   Widget _buildChart(List<FlSpot> chartData) {
     return Container(
       height: 300, // Define a altura para metade da altura da tela
-      padding:
-          EdgeInsets.only(right: 20, left: 16), // Adicionado padding à esquerda
+      padding: const EdgeInsets.only(right: 20, left: 16), // Adicionado padding à esquerda
       child: LineChart(
         LineChartData(
-          gridData: FlGridData(show: false), // Desativa a grade
+          gridData: const FlGridData(show: false), // Desativa a grade
           titlesData: FlTitlesData(
-            bottomTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 22,
-              getTextStyles: (context, value) => const TextStyle(
-                color: Colors.blueGrey,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
+            // EIXO X (Embaixo)
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 32,
+                getTitlesWidget: (double value, TitleMeta meta) {
+                  return SideTitleWidget(
+                    axisSide: meta.axisSide,
+                    space: 10, // Antigo margin
+                    child: Text(
+                      getTitleForValue(value, chartData), // Usa a função personalizada
+                      style: const TextStyle(
+                        color: Colors.blueGrey,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  );
+                },
               ),
-              getTitles: (value) {
-                return getTitleForValue(value, chartData); // Usa a função personalizada para obter títulos
-              },
-              margin: 10,
-            ),            leftTitles: SideTitles(
-              showTitles: true,
-              getTitles: (value) {
-                return formatCurrencyBRL(value); // Formatação para BRL
-              },
-              getTextStyles: (context, value) => const TextStyle(
-                color:
-                    Colors.blueGrey, // Cor azul-cinza para os títulos do eixo Y
-                fontSize: 12, // Tamanho de fonte conforme sua especificação
-              ),
-              reservedSize: 40, // Espaço suficiente ajustado para legibilidade
-              margin: 12,// Margem mantida
             ),
-            rightTitles: SideTitles(showTitles: false),
-            topTitles: SideTitles(showTitles: false),
+            // EIXO Y (Esquerda)
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 52, // Aumentado um pouco para evitar corte no BRL
+                getTitlesWidget: (double value, TitleMeta meta) {
+                  return SideTitleWidget(
+                    axisSide: meta.axisSide,
+                    space: 12, // Antigo margin
+                    child: Text(
+                      formatCurrencyBRL(value), // Formatação para BRL
+                      style: const TextStyle(
+                        color: Colors.blueGrey,
+                        fontSize: 12,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            // Desativa os outros eixos
+            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           ),
           borderData: FlBorderData(
             show: true,
@@ -193,29 +208,30 @@ class _ChartPageState extends State<ChartPage> {
             LineChartBarData(
               spots: chartData,
               isCurved: true,
-              colors: [
-                Colors.grey[900]!
-              ], // Utiliza uma lista de cores, e faz unwrap do opcional
+              color: Colors.grey[900]!, // Mudou de 'colors: [...]' para 'color'
               barWidth: 2,
               isStrokeCapRound: true,
-              dotData: FlDotData(show: false),
+              dotData: const FlDotData(show: false),
               belowBarData: BarAreaData(show: false),
             ),
           ],
           lineTouchData: LineTouchData(
             touchTooltipData: LineTouchTooltipData(
-              tooltipBgColor: Colors.blueGrey, // Fundo do tooltip
+              // Mudou de tooltipBgColor para getTooltipColor
+              getTooltipColor: (LineBarSpot touchedSpot) => Colors.blueGrey,
               tooltipPadding: const EdgeInsets.all(8),
               tooltipMargin: 5,
               getTooltipItems: (List<LineBarSpot> touchedSpots) {
                 return touchedSpots.map((touchedSpot) {
-                  final textStyle = TextStyle(
-                    color: Colors.white, // Cor do texto para branco
+                  const textStyle = TextStyle(
+                    color: Colors.white,
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   );
                   return LineTooltipItem(
-                      formatCurrencyBRL(touchedSpot.y), textStyle);
+                    formatCurrencyBRL(touchedSpot.y),
+                    textStyle,
+                  );
                 }).toList();
               },
             ),

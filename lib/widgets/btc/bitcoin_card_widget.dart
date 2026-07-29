@@ -163,7 +163,6 @@ class _DividendChartState extends State<DividendChart> {
               ],
             ),
           ),
-
           Container(
             height: MediaQuery.of(context).size.height * 0.5,
             child: Padding(
@@ -171,9 +170,10 @@ class _DividendChartState extends State<DividendChart> {
               child: Container(
                 padding: const EdgeInsets.all(8.0),
                 child: SfCartesianChart(
-                  primaryXAxis: CategoryAxis(),
-                  primaryYAxis: NumericAxis(),
-                  series: <ChartSeries>[
+                  primaryXAxis: const CategoryAxis(),
+                  primaryYAxis: const NumericAxis(),
+                  // A MUDANÇA PRINCIPAL ESTÁ AQUI NA LINHA ABAIXO:
+                  series: <CartesianSeries>[
                     BarSeries<ChartData, String>(
                       dataSource: _createChartData('Dividendos'),
                       xValueMapper: (ChartData data, _) => data.xValue,
@@ -191,7 +191,7 @@ class _DividendChartState extends State<DividendChart> {
                       dataSource: _createChartData('JCP'),
                       xValueMapper: (ChartData data, _) => data.xValue,
                       yValueMapper: (ChartData data, _) => data.yValue,
-                      dataLabelSettings: DataLabelSettings(
+                      dataLabelSettings: const DataLabelSettings(
                         isVisible: true,
                         labelPosition: ChartDataLabelPosition.outside,
                         textStyle: TextStyle(fontSize: 10),
@@ -201,7 +201,7 @@ class _DividendChartState extends State<DividendChart> {
                       legendItemText: 'JCP',
                     ),
                   ],
-                  legend: Legend(
+                  legend: const Legend(
                     isVisible: true,
                     position: LegendPosition.bottom, // Posição da legenda
                   ),

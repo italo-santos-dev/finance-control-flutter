@@ -412,7 +412,7 @@ class _GraphPageState extends State<GraphPage> {
     return LineChartBarData(
       spots: _getDataSpots(data, key),
       isCurved: true,
-      colors: [color],
+      color: color,
       belowBarData: BarAreaData(show: false),
     );
   }
@@ -545,64 +545,84 @@ class _GraphPageState extends State<GraphPage> {
                     ),
                   ),
                   titlesData: FlTitlesData(
-                    bottomTitles: SideTitles(
-                      showTitles: true,
-                      getTextStyles: (context, value) => const TextStyle(
-                        color: Colors.blueGrey,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                    // EIXO X (Embaixo)
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 32, // Espaço reservado para o texto
+                        getTitlesWidget: (double value, TitleMeta meta) {
+                          final index = value.toInt();
+                          String texto = '';
+                          
+                          if (index >= 0 && index < uniqueMonths.length) {
+                            var parts = uniqueMonths[index].split('-');
+                            texto = '${parts[0]}/${parts[1].substring(2)}'; // Exibe MM/YY
+                          }
+                          
+                          return SideTitleWidget(
+                            axisSide: meta.axisSide,
+                            space: 10, // Antigo margin
+                            child: Text(
+                              texto,
+                              style: const TextStyle(
+                                color: Colors.blueGrey,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                      margin: 10,
-                      rotateAngle: 0,
-                      getTitles: (double value) {
-                        final index = value.toInt();
-                        if (index >= 0 && index < uniqueMonths.length) {
-                          var parts = uniqueMonths[index].split('-');
-                          return '${parts[0]}/${parts[1].substring(2)}'; // Display as MM/YY
-                        }
-                        return '';
-                      },
                     ),
-                    leftTitles: SideTitles(
-                      showTitles: true,
-                      getTextStyles: (context, value) => const TextStyle(
-                        color: Colors.blueGrey,
-                        fontSize: 12,
+                    // EIXO Y (Esquerda)
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 40,
+                        interval: 500,
+                        getTitlesWidget: (double value, TitleMeta meta) {
+                          return SideTitleWidget(
+                            axisSide: meta.axisSide,
+                            space: 12, // Antigo margin
+                            child: Text(
+                              simplifiedCurrencyFormat(value),
+                              style: const TextStyle(
+                                color: Colors.blueGrey,
+                                fontSize: 12,
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                      reservedSize: 40,
-                      margin: 12,
-                      interval: 500,
-                      getTitles: (value) => simplifiedCurrencyFormat(value),
                     ),
-                    topTitles: SideTitles(showTitles: false),
-                    rightTitles: SideTitles(showTitles: false),
+                    // Desativando eixos do topo e da direita
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                   ),
                   borderData: FlBorderData(show: false),
                   lineBarsData: [
                     LineChartBarData(
                       spots: lineSpots,
                       isCurved: true,
-                      colors: [Theme.of(context).colorScheme.secondary],
+                      // Singular e sem colchetes:
+                      color: Theme.of(context).colorScheme.secondary, 
                       barWidth: 2,
                       isStrokeCapRound: true,
-                      dotData: FlDotData(show: true),
+                      dotData: const FlDotData(show: true),
                       belowBarData: BarAreaData(
                         show: true,
-                        colors: [
-                          Theme.of(context)
-                              .colorScheme
-                              .secondary
-                              .withOpacity(0.3)
-                        ],
+                        // Singular e sem colchetes:
+                        color: Theme.of(context).colorScheme.secondary.withOpacity(0.3), 
                       ),
                     ),
                   ],
                   lineTouchData: LineTouchData(
                     touchTooltipData: LineTouchTooltipData(
-                      tooltipBgColor: Colors.blueGrey,
+                      // Nova função de cor de fundo do tooltip:
+                      getTooltipColor: (LineBarSpot touchedSpot) => Colors.blueGrey,
                       getTooltipItems: (List<LineBarSpot> touchedSpots) {
                         return touchedSpots.map((touchedSpot) {
-                          final textStyle = TextStyle(
+                          const textStyle = TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
                             fontSize: 14,

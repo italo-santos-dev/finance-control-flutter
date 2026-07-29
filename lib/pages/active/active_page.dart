@@ -15,7 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:collection/collection.dart';
 
 class AssetList extends StatefulWidget {
-  const AssetList({Key? key}) : super(key: key);
+  const AssetList({super.key});
 
   @override
   State<AssetList> createState() => _AssetListState();
@@ -70,8 +70,8 @@ class _AssetListState extends State<AssetList> {
               ),
             ),
             IconButton(
-              icon: Icon(
-                _hideValues ? Icons.visibility_off : Icons.visibility,
+              icon: FaIcon(
+                _hideValues ? FontAwesomeIcons.eyeSlash : FontAwesomeIcons.eye,
                 color: Colors.white,
                 size: 20.0,
               ),
@@ -95,8 +95,8 @@ class _AssetListState extends State<AssetList> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(
-              Icons.edit,
+            icon: const FaIcon(
+              FontAwesomeIcons.edit,
               color: Colors.white,
             ),
             onPressed: () {
@@ -104,7 +104,10 @@ class _AssetListState extends State<AssetList> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.delete, color: Colors.white),
+            icon: const FaIcon(
+              FontAwesomeIcons.trash,
+              color: Colors.white,
+            ),
             onPressed: () {
               _showDeleteAssetDialog(context, selectedAsset!);
             },
@@ -187,13 +190,13 @@ class _AssetListState extends State<AssetList> {
                   // Adicione os novos campos aqui
                   // Exemplo:
                   DropdownButtonFormField<String>(
-                    value: selectedLiquidationCode,
+                    initialValue: selectedLiquidationCode,
                     onChanged: (value) {
                       setState(() {
-                        selectedLiquidationCode = value as String?;
+                        selectedLiquidationCode = value;
                       });
                     },
-                    items: [
+                    items: const [
                       DropdownMenuItem(
                         value: 'true',
                         child: Text('Sim'),
@@ -204,7 +207,7 @@ class _AssetListState extends State<AssetList> {
                       ),
                     ],
                     decoration:
-                        InputDecoration(labelText: 'Código de Liquidação'),
+                        const InputDecoration(labelText: 'Código de Liquidação'),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Por favor, selecione uma opção para a flag de liquidação';
@@ -683,13 +686,13 @@ class _AssetListState extends State<AssetList> {
     });
   }
 
-  Widget _bottomAction(IconData icon, VoidCallback onTap) {
+  Widget _bottomAction(FaIconData icon, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.all(8.0),
-        child: Icon(
-          icon,
+        child: FaIcon(
+          icon as FaIconData?,
           color: Colors.grey[900],
           size: 20.0,
         ),
@@ -1121,12 +1124,12 @@ class _AssetListState extends State<AssetList> {
               padding: const EdgeInsets.only(bottom: 16.0),
               child: FloatingActionButton(
                 backgroundColor: Colors.grey,
-                child: const Icon(Icons.add, color: Colors.black),
                 shape: const CircleBorder(),
                 onPressed: () {
                   _showAddAssetDialog(context);
                 },
                 elevation: 0.0,
+                child: const FaIcon(FontAwesomeIcons.plus, color: Colors.black),
               ),
             )
           : null,

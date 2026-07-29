@@ -83,8 +83,7 @@ class _PortfolioPerformanceChartState extends State<PortfolioPerformanceChart> {
     return cdiData;
   }
 
-
-  LineChartData mainData(List<String> dates) {
+LineChartData mainData(List<String> dates) {
     // Definir o intervalo com base no número de datas para evitar superlotação no eixo X
     int interval = max(1, dates.length ~/ 4); // Por exemplo, exibir uma etiqueta a cada 1/6 das datas
 
@@ -97,23 +96,24 @@ class _PortfolioPerformanceChartState extends State<PortfolioPerformanceChart> {
         FlSpot(index.toDouble(), cdiData[index]));
 
     return LineChartData(
-      gridData: FlGridData(show: false),
+      gridData: const FlGridData(show: false),
       lineTouchData: LineTouchData(
         touchTooltipData: LineTouchTooltipData(
-          tooltipBgColor: Colors.blueGrey,
+          // Mudou de tooltipBgColor para getTooltipColor
+          getTooltipColor: (LineBarSpot touchedSpot) => Colors.blueGrey,
           getTooltipItems: (List<LineBarSpot> touchedSpots) {
             return touchedSpots.map((touchedSpot) {
               final TextStyle textStyle;
               if (touchedSpot.barIndex == 0) {
                 // Estilo para a carteira
-                textStyle = TextStyle(
+                textStyle = const TextStyle(
                   color: Colors.black,  // Cor preta para a carteira
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
                 );
               } else {
                 // Estilo para o CDI
-                textStyle = TextStyle(
+                textStyle = const TextStyle(
                   color: Colors.green,  // Cor verde para o CDI
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
@@ -125,68 +125,94 @@ class _PortfolioPerformanceChartState extends State<PortfolioPerformanceChart> {
             }).toList();
           },
         ),
-      ),      titlesData: FlTitlesData(
-        bottomTitles: SideTitles(
-          showTitles: true,
-          getTextStyles: (context, value) => const TextStyle(
-            color: Colors.blueGrey,
-            fontWeight: FontWeight.bold,
-            fontSize: 12,
+      ),
+      titlesData: FlTitlesData(
+        // EIXO X (Embaixo)
+        bottomTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            interval: 1, // O intervalo do componente fica em 1 para passar por todos
+            reservedSize: 32, // Espaço para não cortar o texto
+            getTitlesWidget: (double value, TitleMeta meta) {
+              int index = value.toInt();
+              String texto = '';
+              // Mostra a etiqueta apenas a cada 'interval' índices e garante que não ultrapassa a lista
+              if (index >= 0 && index < dates.length && index % interval == 0) {
+                texto = dates[index];
+              }
+              return SideTitleWidget(
+                axisSide: meta.axisSide,
+                space: 8, // Antigo margin
+                child: Text(
+                  texto,
+                  style: const TextStyle(
+                    color: Colors.blueGrey,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              );
+            },
           ),
-          getTitles: (value) {
-            int index = value.toInt();
-            // Mostra a etiqueta apenas a cada 'interval' índices
-            return index % interval == 0 ? dates[index] : '';
-          },
-          interval: 1,
-          margin: 8,
         ),
-        topTitles: SideTitles(showTitles: false),
-        rightTitles: SideTitles(showTitles: false),
-        leftTitles: SideTitles(
-          showTitles: true,
-          getTextStyles: (context, value) => const TextStyle(
-            color: Colors.blueGrey,
-            fontSize: 10,
+        // Desativa topo e direita
+        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        // EIXO Y (Esquerda)
+        leftTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            reservedSize: 40,
+            getTitlesWidget: (double value, TitleMeta meta) {
+              return SideTitleWidget(
+                axisSide: meta.axisSide,
+                space: 12, // Antigo margin
+                child: Text(
+                  '${value.toStringAsFixed(0)}%',
+                  style: const TextStyle(
+                    color: Colors.blueGrey,
+                    fontSize: 10,
+                  ),
+                ),
+              );
+            },
           ),
-          getTitles: (value) => '${value.toStringAsFixed(0)}%',
-          margin: 12,
-          reservedSize: 40,
         ),
       ),
       borderData: FlBorderData(show: false),
       minX: 0,
-      maxX: dates.length - 1,
+      maxX: (dates.length - 1).toDouble(), // Convertido para double para evitar erro de tipo
       minY: 0,
-      maxY: max(_returnPercentage + 5, cdiData.last + 5),
+      maxY: max(_returnPercentage + 5, cdiData.isNotEmpty ? cdiData.last + 5 : 5),
       lineBarsData: [
+        // LINHA DA CARTEIRA
         LineChartBarData(
           spots: portfolioSpots,
           isCurved: true,
-          colors: [Theme.of(context).colorScheme.secondary],
+          color: Theme.of(context).colorScheme.secondary, // Singular (color)
           barWidth: 5,
-          dotData: FlDotData(show: true),
+          dotData: const FlDotData(show: true),
           belowBarData: BarAreaData(
             show: true,
-            colors: [Theme.of(context).colorScheme.secondary.withOpacity(0.3)],
+            color: Theme.of(context).colorScheme.secondary.withOpacity(0.3), // Singular (color)
           ),
         ),
+        // LINHA DO CDI
         LineChartBarData(
           spots: cdiSpots,
           isCurved: true,
-          colors: [Colors.green],
+          color: Colors.green, // Singular (color)
           barWidth: 5,
-          dotData: FlDotData(show: true),
+          dotData: const FlDotData(show: true),
           belowBarData: BarAreaData(
             show: true,
-            colors: [Colors.green.withOpacity(0.3)],
+            color: Colors.green.withOpacity(0.3), // Singular (color)
           ),
         ),
       ],
     );
   }
 
-  @override
   @override
   Widget build(BuildContext context) {
     List<double> cdiData = simulateCDIData(transactionDates.length);
