@@ -199,8 +199,16 @@ class _HomePageState extends State<HomePage> {
 
       // Sort Em Alta by highest positive change
       emAltaTemp.sort((a, b) => (b['rawChange'] as double).compareTo(a['rawChange'] as double));
-      // Sort Em Baixa by lowest negative change
+
+      // Sort Em Baixa by lowest change (most negative first)
       emBaixaTemp.sort((a, b) => (a['rawChange'] as double).compareTo(b['rawChange'] as double));
+
+      // Fallback for Em Baixa if fewer than 3 negative items exist (e.g. green market / after hours)
+      if (emBaixaTemp.length < 3 && maisNegociadosTemp.isNotEmpty) {
+        var fallbackBaixa = List<Map<String, dynamic>>.from(maisNegociadosTemp);
+        fallbackBaixa.sort((a, b) => (a['rawChange'] as double).compareTo(b['rawChange'] as double));
+        emBaixaTemp = fallbackBaixa;
+      }
 
       // Prioritize top liquid B3 blue-chip stocks for Mais Negociados
       const topLiquidTickers = {
