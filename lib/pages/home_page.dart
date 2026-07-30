@@ -137,17 +137,22 @@ class _HomePageState extends State<HomePage> {
       List<Map<String, dynamic>> maisNegociadosTemp = [];
 
       for (var item in data) {
-        var assetDetails = logoUrls.firstWhere(
-          (element) => element['ticker'] == item['symbol'],
-          orElse: () => {},
-        );
-
         double lastPrice = (item['lastPrice'] as num?)?.toDouble() ?? 0.0;
         double change = (item['change'] as num?)?.toDouble() ?? 0.0;
         double dy = (item['dividendYield'] as num?)?.toDouble() ?? 0.0;
-        String symbol = item['symbol'] ?? '';
-        String name = item['name'] ?? '';
-        String sector = item['sector'] ?? '';
+        String symbol = (item['symbol'] as String?)?.trim() ?? '';
+        String name = (item['name'] as String?)?.trim() ?? '';
+        String sector = (item['sector'] as String?)?.trim() ?? '';
+
+        // Ignore zeroed, unquoted or delisted stocks (price <= 0 or change <= -99%)
+        if (lastPrice <= 0.0 || change <= -99.0 || symbol.isEmpty) {
+          continue;
+        }
+
+        var assetDetails = logoUrls.firstWhere(
+          (element) => element['ticker'] == symbol,
+          orElse: () => {},
+        );
 
         Active active = Active(
           icon: assetDetails.isNotEmpty ? assetDetails['logoUrl'] : AppIcons.btc,
@@ -176,7 +181,7 @@ class _HomePageState extends State<HomePage> {
 
         if (change > 0) {
           emAltaTemp.add(itemData);
-        } else {
+        } else if (change < 0) {
           emBaixaTemp.add(itemData);
         }
         maisNegociadosTemp.add(itemData);

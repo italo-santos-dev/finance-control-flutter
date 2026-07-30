@@ -57,12 +57,13 @@ class _StockTickerWidgetState extends State<StockTickerWidget> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.stocks.isEmpty) {
+    final validStocks = widget.stocks.where((s) => s.lastPrice > 0.0).toList();
+    if (validStocks.isEmpty) {
       return const SizedBox.shrink();
     }
 
     // Duplicate list 3 times for endless seamless scrolling effect
-    final displayList = [...widget.stocks, ...widget.stocks, ...widget.stocks];
+    final displayList = [...validStocks, ...validStocks, ...validStocks];
 
     return SizedBox(
       height: 38,
