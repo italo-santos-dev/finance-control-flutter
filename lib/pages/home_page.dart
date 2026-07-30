@@ -10,6 +10,7 @@ import 'package:flutter_investment_control/pages/active/details/active_details_p
 import 'package:flutter_investment_control/pages/active/active_page.dart';
 import 'package:flutter_investment_control/services/apis/api_awesome_markets.dart';
 import 'package:flutter_investment_control/services/apis/api_brapi_get_logo.dart';
+import 'package:flutter_investment_control/services/apis/api_news_service.dart';
 import 'package:flutter_investment_control/services/apis/api_stocks_ibovespa.dart';
 import 'package:flutter_investment_control/widgets/adverts/adverts_widget.dart';
 import 'package:flutter_investment_control/widgets/btc/chart_page.dart';
@@ -83,6 +84,7 @@ class _HomePageState extends State<HomePage> {
   StockIbovespaApi api = StockIbovespaApi();
   ApiBrapiGetLogo apiBrapi = ApiBrapiGetLogo();
   AwesomeMarketsApi apiAwesome = AwesomeMarketsApi();
+  FinancialNewsService apiNews = FinancialNewsService();
 
   InterstitialAd? _interstitialAd;
 
@@ -261,33 +263,14 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // Fetch real financial news
+  // Fetch real financial news combining BRAPI and G1 Economia / InfoMoney RSS
   Future<void> fetchNews() async {
     try {
-      final response = await http.get(Uri.parse('https://brapi.dev/api/news?limit=4'));
-      if (response.statusCode == 200) {
-        final jsonData = jsonDecode(response.body);
-        final newsData = jsonData['news'] as List<dynamic>? ?? [];
-        List<Map<String, dynamic>> loadedNews = [];
-
-        for (int i = 0; i < newsData.length; i++) {
-          var n = newsData[i];
-          loadedNews.add({
-            "badge": i % 2 == 0 ? "MACROECONOMIA" : "TECH & IA",
-            "badgeColor": i % 2 == 0 ? AppColors.primaryBlue : AppColors.emeraldGreen,
-            "source": "${n['source'] ?? 'Notícias'} • ${n['date'] ?? ''}",
-            "title": n['title'] ?? '',
-            "image": n['imageUrl'] ?? (i % 2 == 0 
-                ? "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?q=80&w=800&auto=format&fit=crop"
-                : "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800&auto=format&fit=crop"),
-          });
-        }
-
-        if (mounted && loadedNews.isNotEmpty) {
-          setState(() {
-            newsList = loadedNews;
-          });
-        }
+      final loadedNews = await apiNews.fetchCombinedNews();
+      if (mounted && loadedNews.isNotEmpty) {
+        setState(() {
+          newsList = loadedNews;
+        });
       }
     } catch (e) {
       debugPrint('Error fetching news: $e');
