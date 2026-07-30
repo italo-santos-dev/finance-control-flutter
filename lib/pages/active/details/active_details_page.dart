@@ -6,7 +6,6 @@ import 'package:flutter_investment_control/models/active_model.dart';
 import 'package:flutter_investment_control/services/apis/api_stock_indicators.dart';
 import 'package:flutter_investment_control/services/apis/api_stocks_dividends.dart';
 import 'package:flutter_investment_control/services/apis/api_stocks_historicals.dart';
-import 'package:flutter_investment_control/widgets/btc/chart_page.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
@@ -86,27 +85,34 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
   }
 
   Future<List<FlSpot>> _fetchChartData({int months = 3}) async {
-    var stockData =
-    await StocksHistoricals().getStockHistoricals(widget.active.symbol, months);
-    List<dynamic> historicals = stockData?['historicals'] ?? [];
+    try {
+      var stockData =
+          await StocksHistoricals().getStockHistoricals(widget.active.symbol, months);
+      List<dynamic> historicals = stockData?['historicals'] ?? [];
 
-    if (historicals.isEmpty) {
-      print("Nenhum dado histórico recebido para os últimos $months meses.");
+      if (historicals.isEmpty) {
+        print("Nenhum dado histórico recebido para os últimos $months meses.");
+        return [];
+      }
+
+      List<FlSpot> chartData = [];
+      for (var i = 0; i < historicals.length; i++) {
+        if (historicals[i]['date'] == null || historicals[i]['close'] == null) continue;
+        DateTime? date = DateTime.tryParse(historicals[i]['date'].toString());
+        if (date == null) continue;
+        double close = (historicals[i]['close'] as num).toDouble();
+        chartData.add(FlSpot(date.millisecondsSinceEpoch.toDouble(), close));
+      }
+
+      print(
+          "Recebidos ${historicals.length} pontos de dados da API para os últimos $months meses.");
+      print(
+          "Processados ${chartData.length} pontos de dados FlSpot para o gráfico.");
+      return chartData;
+    } catch (e) {
+      print('Error fetching chart data: $e');
       return [];
     }
-
-    List<FlSpot> chartData = [];
-    for (var i = 0; i < historicals.length; i++) {
-      DateTime date = DateTime.parse(historicals[i]['date']);
-      double close = (historicals[i]['close'] as num).toDouble();
-      chartData.add(FlSpot(date.millisecondsSinceEpoch.toDouble(), close));
-    }
-
-    print(
-        "Recebidos ${historicals.length} pontos de dados da API para os últimos $months meses.");
-    print(
-        "Processados ${chartData.length} pontos de dados FlSpot para o gráfico.");
-    return chartData;
   }
 
   Future<List<double>> _calculateReturns() async {
@@ -818,6 +824,37 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
   }
 
   Widget _buildChart(List<FlSpot> chartData) {
+    if (chartData.isEmpty) {
+      return Container(
+        height: 200,
+        alignment: Alignment.center,
+        child: const Text(
+          'Sem dados de cotação disponíveis para este período.',
+          style: TextStyle(
+            color: Colors.grey,
+            fontSize: 14,
+          ),
+        ),
+      );
+    }
+
+    double minY = chartData.map((spot) => spot.y).reduce(min);
+    double maxY = chartData.map((spot) => spot.y).reduce(max);
+    if (minY == maxY) {
+      minY = minY > 0 ? minY * 0.9 : -1.0;
+      maxY = maxY > 0 ? maxY * 1.1 : 1.0;
+    } else {
+      minY = minY * 0.9;
+      maxY = maxY * 1.1;
+    }
+
+    double minX = chartData.first.x;
+    double maxX = chartData.last.x;
+    if (minX == maxX) {
+      minX = minX - 86400000;
+      maxX = maxX + 86400000;
+    }
+
     return Container(
       height: 300, // Define a altura para metade da altura da tela
       padding:
@@ -875,10 +912,10 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
             show: true,
             border: Border.all(color: const Color(0xffe7e8ec), width: 1),
           ),
-          minX: chartData.first.x,
-          maxX: chartData.last.x,
-          minY: chartData.map((spot) => spot.y).reduce(min) * 0.9,
-          maxY: chartData.map((spot) => spot.y).reduce(max) * 1.1,
+          minX: minX,
+          maxX: maxX,
+          minY: minY,
+          maxY: maxY,
           lineBarsData: [
             LineChartBarData(
               spots: chartData,
@@ -916,6 +953,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
   }
 
   String getTitleForValue(double value, List<FlSpot> chartData) {
+    if (chartData.isEmpty) return '';
     // Find the closest data point, because exact matches of timestamps might not be aligned.
     var closestSpot = chartData.reduce((a, b) => (value - a.x).abs() < (value - b.x).abs() ? a : b);
     var date = DateTime.fromMillisecondsSinceEpoch(closestSpot.x.toInt());
@@ -937,7 +975,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
             _buildIndicatorCard(
               name: value['name'],
               description: value['description'] ?? '',
-              value: value['value'].toString() ?? '',
+              value: value['value']?.toString() ?? '',
               infoIcon: infoIcon,
               historyIcon: historyIcon,
             ),
@@ -1324,15 +1362,18 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
     int currentYear = DateTime.now().year;
 
     List<Map<String, dynamic>> dividendsLastFiveYears = dividends.where((dividend) {
-      DateTime date = DateTime.parse(dividend['date']);
-      return date.year >= currentYear - 5;
+      if (dividend['date'] == null) return false;
+      DateTime? date = DateTime.tryParse(dividend['date'].toString());
+      return date != null && date.year >= currentYear - 5;
     }).toList();
 
     print('dividendsLastFiveYears: $dividendsLastFiveYears');
 
     double totalDividends = 0.0;
     for (var dividend in dividendsLastFiveYears) {
-      totalDividends += dividend['value'];
+      if (dividend['value'] != null) {
+        totalDividends += double.tryParse(dividend['value'].toString()) ?? 0.0;
+      }
     }
 
     print('totalDividends: ${dividendsLastFiveYears.length}');

@@ -570,27 +570,34 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _createInterstitialAd() {
-    InterstitialAd.load(
-      adUnitId: 'ca-app-pub-3940256099942544/1033173712',
-      request: const AdRequest(),
-      adLoadCallback: InterstitialAdLoadCallback(
-        // Called when an ad is successfully received.
-        onAdLoaded: (ad) {
-          debugPrint('$ad loaded.');
-          // Keep a reference to the ad so you can show it later.
-          _interstitialAd = ad;
-        },
-        // Called when an ad request failed.
-        onAdFailedToLoad: (LoadAdError error) {
-          debugPrint('InterstitialAd failed to load: $error');
-        },
-      ),
-    );
+    try {
+      InterstitialAd.load(
+        adUnitId: 'ca-app-pub-3940256099942544/1033173712',
+        request: const AdRequest(),
+        adLoadCallback: InterstitialAdLoadCallback(
+          // Called when an ad is successfully received.
+          onAdLoaded: (ad) {
+            debugPrint('$ad loaded.');
+            // Keep a reference to the ad so you can show it later.
+            _interstitialAd = ad;
+          },
+          // Called when an ad request failed.
+          onAdFailedToLoad: (LoadAdError error) {
+            debugPrint('InterstitialAd failed to load: $error');
+            _interstitialAd = null;
+          },
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error loading interstitial ad: $e');
+      _interstitialAd = null;
+    }
   }
 
   void _showInterstitialAd(OnAdClosedCallback onAdClosed) {
     if (_interstitialAd == null) {
       print('Anúncio null');
+      onAdClosed();
       return;
     }
 
@@ -598,20 +605,38 @@ class _HomePageState extends State<HomePage> {
       onAdDismissedFullScreenContent: (InterstitialAd ad) {
         print('$ad onAdDismissedFullScreenContent.');
         ad.dispose();
+        _interstitialAd = null;
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
         onAdClosed();
       },
       onAdFailedToShowFullScreenContent: (InterstitialAd ad, AdError error) {
         print('$ad onAdFailedToShowFullScreenContent: $error');
         ad.dispose();
+        _interstitialAd = null;
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
+        onAdClosed();
       },
       onAdImpression: (InterstitialAd ad) => print('$ad impression occurred.'),
     );
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => LoadingScreen(onAdClosed: onAdClosed)),
-    );
+    try {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => LoadingScreen(onAdClosed: onAdClosed)),
+      );
 
-    _interstitialAd?.show();
+      _interstitialAd?.show();
+    } catch (e) {
+      print('Error showing interstitial ad: $e');
+      _interstitialAd = null;
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      onAdClosed();
+    }
   }
 }

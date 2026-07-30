@@ -6,7 +6,11 @@ import 'core/app_widget.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  MobileAds.instance.initialize();
+  try {
+    MobileAds.instance.initialize();
+  } catch (e) {
+    debugPrint('Error initializing MobileAds: $e');
+  }
 
   runApp(
     ChangeNotifierProvider(
