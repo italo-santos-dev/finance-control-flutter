@@ -37,7 +37,7 @@ class FinancialNewsService {
 
     // 2. Extract <img> src from HTML description or content
     String html = (item['description'] ?? item['content'] ?? '').toString();
-    RegExp imgRegExp = RegExp(r'<img[^>]+src=["\']([^"\']+)["\']', caseSensitive: false);
+    RegExp imgRegExp = RegExp(r'<img[^>]+src="([^"]+)"', caseSensitive: false);
     Match? match = imgRegExp.firstMatch(html);
     if (match != null && match.group(1) != null) {
       String src = match.group(1)!.trim();
