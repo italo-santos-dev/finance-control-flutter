@@ -39,6 +39,11 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> emAltaList = [];
   List<Map<String, dynamic>> emBaixaList = [];
   List<Map<String, dynamic>> maisNegociadosList = [];
+
+  List<Map<String, dynamic>> globalEmAltaList = [];
+  List<Map<String, dynamic>> globalEmBaixaList = [];
+  List<Map<String, dynamic>> globalMaisNegociadosList = [];
+
   List<Map<String, dynamic>> globalMarketsList = [];
   List<Map<String, dynamic>> newsList = [];
 
@@ -254,8 +259,37 @@ class _HomePageState extends State<HomePage> {
     try {
       final markets = await apiAwesome.fetchGlobalMarkets();
       if (mounted && markets.isNotEmpty) {
+        List<Map<String, dynamic>> globalCandidates = [];
+        for (var m in markets) {
+          double changeVal = double.tryParse(m['change'].toString().replaceAll('%', '').replaceAll('+', '').trim()) ?? 0.0;
+          double priceVal = double.tryParse(m['price'].toString().replaceAll('R\$', '').replaceAll('.', '').replaceAll(',', '.').trim()) ?? 0.0;
+
+          globalCandidates.add({
+            "symbol": m['symbol'],
+            "name": m['name'],
+            "sector": "Mercado Global",
+            "price": m['price'],
+            "rawPrice": priceVal,
+            "change": m['change'],
+            "rawChange": changeVal,
+            "isPositive": m['isPositive'] ?? (changeVal >= 0),
+          });
+        }
+
+        List<Map<String, dynamic>> gAlta = List.from(globalCandidates);
+        gAlta.sort((a, b) => (b['rawChange'] as double).compareTo(a['rawChange'] as double));
+
+        List<Map<String, dynamic>> gBaixa = List.from(globalCandidates);
+        gBaixa.sort((a, b) => (a['rawChange'] as double).compareTo(b['rawChange'] as double));
+
+        List<Map<String, dynamic>> gMais = List.from(globalCandidates);
+        gMais.sort((a, b) => (b['rawPrice'] as double).compareTo(a['rawPrice'] as double));
+
         setState(() {
           globalMarketsList = markets;
+          globalEmAltaList = gAlta.take(3).toList();
+          globalEmBaixaList = gBaixa.take(3).toList();
+          globalMaisNegociadosList = gMais.take(3).toList();
         });
       }
     } catch (e) {
@@ -347,10 +381,24 @@ class _HomePageState extends State<HomePage> {
                                   _buildSectionHeader('Mercados Globais', onSeeAll: () {}),
                                   const SizedBox(height: 12),
                                   _buildGlobalMarketsRow(),
-                                  const SizedBox(height: 24),
+                                  const SizedBox(height: 16),
+                                  _buildMarketListsSection(
+                                    isDesktop,
+                                    alta: globalEmAltaList,
+                                    baixa: globalEmBaixaList,
+                                    maisNegociados: globalMaisNegociadosList,
+                                  ),
+                                  const SizedBox(height: 32),
+                                  _buildSectionHeader('Mercado Brasileiro', onSeeAll: () {}),
+                                  const SizedBox(height: 12),
                                   _buildCategoryFilters(),
-                                  const SizedBox(height: 24),
-                                  _buildMarketListsSection(isDesktop),
+                                  const SizedBox(height: 16),
+                                  _buildMarketListsSection(
+                                    isDesktop,
+                                    alta: emAltaList,
+                                    baixa: emBaixaList,
+                                    maisNegociados: maisNegociadosList,
+                                  ),
                                   const SizedBox(height: 24),
                                   _buildSectionHeaderWithIcon(Icons.newspaper_outlined, 'Radar Financeiro', onSeeAll: () {}),
                                   const SizedBox(height: 12),
@@ -984,7 +1032,12 @@ class _HomePageState extends State<HomePage> {
   }
 
   // Responsive Market Lists Section (Em Alta, Em Baixa, Mais Negociados)
-  Widget _buildMarketListsSection(bool isDesktop) {
+  Widget _buildMarketListsSection(
+    bool isDesktop, {
+    required List<Map<String, dynamic>> alta,
+    required List<Map<String, dynamic>> baixa,
+    required List<Map<String, dynamic>> maisNegociados,
+  }) {
     if (isLoading) {
       return _buildLoadingScreen();
     }
@@ -993,21 +1046,21 @@ class _HomePageState extends State<HomePage> {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(child: _buildListCardColumn('Em Alta Hoje', Icons.local_fire_department_outlined, AppColors.fireRed, emAltaList)),
+          Expanded(child: _buildListCardColumn('Em Alta Hoje', Icons.local_fire_department_outlined, AppColors.fireRed, alta)),
           const SizedBox(width: 16),
-          Expanded(child: _buildListCardColumn('Em Baixa Hoje', Icons.trending_down_outlined, AppColors.redLoss, emBaixaList)),
+          Expanded(child: _buildListCardColumn('Em Baixa Hoje', Icons.trending_down_outlined, AppColors.redLoss, baixa)),
           const SizedBox(width: 16),
-          Expanded(child: _buildListCardColumn('Mais Negociados', Icons.swap_vert_outlined, AppColors.blueAccent, maisNegociadosList)),
+          Expanded(child: _buildListCardColumn('Mais Negociados', Icons.swap_vert_outlined, AppColors.blueAccent, maisNegociados)),
         ],
       );
     } else {
       return Column(
         children: [
-          _buildListCardColumn('Em Alta Hoje', Icons.local_fire_department_outlined, AppColors.fireRed, emAltaList),
+          _buildListCardColumn('Em Alta Hoje', Icons.local_fire_department_outlined, AppColors.fireRed, alta),
           const SizedBox(height: 12),
-          _buildListCardColumn('Em Baixa Hoje', Icons.trending_down_outlined, AppColors.redLoss, emBaixaList),
+          _buildListCardColumn('Em Baixa Hoje', Icons.trending_down_outlined, AppColors.redLoss, baixa),
           const SizedBox(height: 12),
-          _buildListCardColumn('Mais Negociados', Icons.swap_vert_outlined, AppColors.blueAccent, maisNegociadosList),
+          _buildListCardColumn('Mais Negociados', Icons.swap_vert_outlined, AppColors.blueAccent, maisNegociados),
         ],
       );
     }
