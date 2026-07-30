@@ -179,20 +179,43 @@ class _HomePageState extends State<HomePage> {
           "isPositive": change >= 0,
         };
 
-        if (change > 0) {
-          emAltaTemp.add(itemData);
-        } else if (change < 0) {
-          emBaixaTemp.add(itemData);
+        // Filter out pure indices (IBOVESPA, IFIX) and illiquid anomaly microcaps (>50% change or >R$500 price)
+        bool isIndex = symbol.toUpperCase().contains('IBOV') ||
+            symbol.toUpperCase().contains('IFIX') ||
+            name.toUpperCase().contains('ÍNDICE') ||
+            name.toUpperCase().contains('INDICE');
+
+        bool isAnomaly = change.abs() > 50.0 || (lastPrice > 500.0 && !symbol.contains('/'));
+
+        if (!isIndex && !isAnomaly) {
+          if (change > 0) {
+            emAltaTemp.add(itemData);
+          } else if (change < 0) {
+            emBaixaTemp.add(itemData);
+          }
+          maisNegociadosTemp.add(itemData);
         }
-        maisNegociadosTemp.add(itemData);
       }
 
       // Sort Em Alta by highest positive change
       emAltaTemp.sort((a, b) => (b['rawChange'] as double).compareTo(a['rawChange'] as double));
       // Sort Em Baixa by lowest negative change
       emBaixaTemp.sort((a, b) => (a['rawChange'] as double).compareTo(b['rawChange'] as double));
-      // Sort Mais Negociados by highest price/market volume
-      maisNegociadosTemp.sort((a, b) => (b['rawPrice'] as double).compareTo(a['rawPrice'] as double));
+
+      // Prioritize top liquid B3 blue-chip stocks for Mais Negociados
+      const topLiquidTickers = {
+        'PETR4', 'VALE3', 'ITUB4', 'BBAS3', 'WEGE3', 'B3SA3', 'ABEV3',
+        'BBDC4', 'MGLU3', 'RENT3', 'SANB11', 'SUZB3', 'JBSS3', 'ELET3',
+        'GGBR4', 'CSNA3', 'LREN3', 'VBBR3', 'PRIO3', 'RAIZ4'
+      };
+
+      maisNegociadosTemp.sort((a, b) {
+        bool aIsTop = topLiquidTickers.contains(a['symbol']);
+        bool bIsTop = topLiquidTickers.contains(b['symbol']);
+        if (aIsTop && !bIsTop) return -1;
+        if (!aIsTop && bIsTop) return 1;
+        return (b['rawPrice'] as double).compareTo(a['rawPrice'] as double);
+      });
 
       if (mounted) {
         setState(() {
