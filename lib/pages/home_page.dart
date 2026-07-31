@@ -7,14 +7,17 @@ import 'package:flutter_investment_control/core/app_colors.dart';
 import 'package:flutter_investment_control/core/app_icons.dart';
 import 'package:flutter_investment_control/models/active_model.dart';
 import 'package:flutter_investment_control/pages/active/details/active_details_page.dart';
-import 'package:flutter_investment_control/pages/active/active_page.dart';
+import 'package:flutter_investment_control/pages/news/news_detail_page.dart';
 import 'package:flutter_investment_control/services/apis/api_awesome_markets.dart';
 import 'package:flutter_investment_control/services/apis/api_brapi_get_logo.dart';
 import 'package:flutter_investment_control/services/apis/api_news_service.dart';
 import 'package:flutter_investment_control/services/apis/api_stocks_ibovespa.dart';
+import 'package:flutter_investment_control/services/apis/global_stocks_service.dart';
 import 'package:flutter_investment_control/widgets/adverts/adverts_widget.dart';
 import 'package:flutter_investment_control/widgets/btc/chart_page.dart';
+import 'package:flutter_investment_control/pages/active/active_page.dart';
 import 'package:flutter_investment_control/widgets/buttons/modern_cta_button.dart';
+import 'package:flutter_investment_control/widgets/buttons/modern_see_all_button.dart';
 import 'package:flutter_investment_control/widgets/home/sparkline_painter.dart';
 import 'package:flutter_investment_control/widgets/home/stock_ticker_widget.dart';
 import 'package:flutter_svg/svg.dart';
@@ -47,23 +50,6 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> globalMarketsList = [];
   List<Map<String, dynamic>> newsList = [];
 
-  final List<Map<String, dynamic>> defaultNewsList = [
-    {
-      "badge": "MACROECONOMIA",
-      "badgeColor": AppColors.primaryBlue,
-      "source": "Valor Econômico • Há 2 horas",
-      "title": "Fed mantém juros e sinaliza cautela para os próximos cortes no ano",
-      "image": "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?q=80&w=800&auto=format&fit=crop",
-    },
-    {
-      "badge": "TECH & IA",
-      "badgeColor": AppColors.emeraldGreen,
-      "source": "Bloomberg • Há 4 horas",
-      "title": "Nvidia supera estimativas e impulsiona rali global de semicondutores",
-      "image": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800&auto=format&fit=crop",
-    },
-  ];
-
   final List<Map<String, dynamic>> courses = [
     {
       "icon": Icons.trending_up,
@@ -90,6 +76,7 @@ class _HomePageState extends State<HomePage> {
   ApiBrapiGetLogo apiBrapi = ApiBrapiGetLogo();
   AwesomeMarketsApi apiAwesome = AwesomeMarketsApi();
   FinancialNewsService apiNews = FinancialNewsService();
+  GlobalStocksRepository globalStocksRepo = GlobalStocksRepository();
 
   InterstitialAd? _interstitialAd;
 
@@ -119,6 +106,17 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 10), (Timer timer) {
       _createInterstitialAd();
+    });
+
+    // Immediate initial sync for global market cards to eliminate any empty state
+    globalStocksRepo.getProcessedGlobalMarketCards().then((processed) {
+      if (mounted) {
+        setState(() {
+          globalEmAltaList = processed["emAlta"]!;
+          globalEmBaixaList = processed["emBaixa"]!;
+          globalMaisNegociadosList = processed["maisNegociados"]!;
+        });
+      }
     });
 
     fetchData();
@@ -254,42 +252,26 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // Fetch real market quotes (BTC/BRL, USD/BRL, EUR/BRL, GBP/BRL, ETH/BRL, CAD/BRL) via AwesomeMarketsApi
+  // Fetch real international stock quotes & global market indexes via GlobalStocksRepository & AwesomeMarketsApi
   Future<void> fetchGlobalMarkets() async {
     try {
       final markets = await apiAwesome.fetchGlobalMarkets();
-      if (mounted && markets.isNotEmpty) {
-        List<Map<String, dynamic>> globalCandidates = [];
-        for (var m in markets) {
-          double changeVal = double.tryParse(m['change'].toString().replaceAll('%', '').replaceAll('+', '').trim()) ?? 0.0;
-          double priceVal = double.tryParse(m['price'].toString().replaceAll('R\$', '').replaceAll('.', '').replaceAll(',', '.').trim()) ?? 0.0;
+      final processedGlobalStocks = await globalStocksRepo.getProcessedGlobalMarketCards();
 
-          globalCandidates.add({
-            "symbol": m['symbol'],
-            "name": m['name'],
-            "sector": "Mercado Global",
-            "price": m['price'],
-            "rawPrice": priceVal,
-            "change": m['change'],
-            "rawChange": changeVal,
-            "isPositive": m['isPositive'] ?? (changeVal >= 0),
-          });
-        }
-
-        List<Map<String, dynamic>> gAlta = List.from(globalCandidates);
-        gAlta.sort((a, b) => (b['rawChange'] as double).compareTo(a['rawChange'] as double));
-
-        List<Map<String, dynamic>> gBaixa = List.from(globalCandidates);
-        gBaixa.sort((a, b) => (a['rawChange'] as double).compareTo(b['rawChange'] as double));
-
-        List<Map<String, dynamic>> gMais = List.from(globalCandidates);
-        gMais.sort((a, b) => (b['rawPrice'] as double).compareTo(a['rawPrice'] as double));
-
+      if (mounted) {
         setState(() {
-          globalMarketsList = markets;
-          globalEmAltaList = gAlta.take(3).toList();
-          globalEmBaixaList = gBaixa.take(3).toList();
-          globalMaisNegociadosList = gMais.take(3).toList();
+          if (markets.isNotEmpty) {
+            globalMarketsList = markets;
+          }
+          if (processedGlobalStocks["emAlta"] != null && processedGlobalStocks["emAlta"]!.isNotEmpty) {
+            globalEmAltaList = processedGlobalStocks["emAlta"]!;
+          }
+          if (processedGlobalStocks["emBaixa"] != null && processedGlobalStocks["emBaixa"]!.isNotEmpty) {
+            globalEmBaixaList = processedGlobalStocks["emBaixa"]!;
+          }
+          if (processedGlobalStocks["maisNegociados"] != null && processedGlobalStocks["maisNegociados"]!.isNotEmpty) {
+            globalMaisNegociadosList = processedGlobalStocks["maisNegociados"]!;
+          }
         });
       }
     } catch (e) {
@@ -756,62 +738,28 @@ class _HomePageState extends State<HomePage> {
   }
 
   // Section Header Helper
-  Widget _buildSectionHeader(String title, {required VoidCallback onSeeAll}) {
+  Widget _buildSectionHeader(String title, {VoidCallback? onSeeAll}) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.bold,
+        color: Colors.white,
+      ),
+    );
+  }
+
+  Widget _buildSectionHeaderWithIcon(IconData icon, String title, {VoidCallback? onSeeAll}) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
+        Icon(icon, size: 18, color: Colors.white),
+        const SizedBox(width: 8),
         Text(
           title,
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
             color: Colors.white,
-          ),
-        ),
-        GestureDetector(
-          onTap: onSeeAll,
-          child: Row(
-            children: const [
-              Text(
-                'Ver todos ',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-              Icon(Icons.arrow_forward, size: 12, color: Colors.grey),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSectionHeaderWithIcon(IconData icon, String title, {required VoidCallback onSeeAll}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 18, color: Colors.white),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ],
-        ),
-        GestureDetector(
-          onTap: onSeeAll,
-          child: Row(
-            children: const [
-              Text(
-                'Ver todos ',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-              Icon(Icons.arrow_forward, size: 12, color: Colors.grey),
-            ],
           ),
         ),
       ],
@@ -973,13 +921,13 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Category Quick Filter Cards
+  // Category Quick Filter Cards (Mercado Brasileiro)
   Widget _buildCategoryFilters() {
     final categories = [
       {"icon": Icons.business_outlined, "label": "Ações"},
       {"icon": Icons.apartment_outlined, "label": "FIIs"},
-      {"icon": FontAwesomeIcons.bitcoin, "label": "Cripto"},
-      {"icon": Icons.public_outlined, "label": "Global"},
+      {"icon": Icons.account_balance_outlined, "label": "Tesouro Direto"},
+      {"icon": Icons.verified_outlined, "label": "BDRs"},
     ];
 
     return Row(
@@ -990,13 +938,9 @@ class _HomePageState extends State<HomePage> {
         return Expanded(
           child: GestureDetector(
             onTap: () {
-              if (cat['label'] == 'Cripto') {
-                navigateToBtcPage();
-              } else {
-                setState(() {
-                  selectedCategory = cat['label'] as String;
-                });
-              }
+              setState(() {
+                selectedCategory = cat['label'] as String;
+              });
             },
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -1094,7 +1038,7 @@ class _HomePageState extends State<HomePage> {
             const Padding(
               padding: EdgeInsets.all(16.0),
               child: Text(
-                'Sem dados no momento',
+                'Dados indisponíveis no momento. Aguardando atualização da fonte de dados.',
                 style: TextStyle(color: Colors.grey, fontSize: 11),
               ),
             )
@@ -1103,6 +1047,10 @@ class _HomePageState extends State<HomePage> {
               bool isPositive = item['isPositive'] ?? true;
               Color changeColor = isPositive ? AppColors.emeraldGreen : AppColors.redLoss;
               Active? active = item['active'] as Active?;
+              String? logoUrl = item['logoUrl'] as String?;
+              String subtitleText = item['volumeStr'] != null
+                  ? '${item['symbol']} • ${item['volumeStr']}'
+                  : '${item['symbol']} • ${item['sector']}';
 
               return InkWell(
                 onTap: () {
@@ -1120,10 +1068,25 @@ class _HomePageState extends State<HomePage> {
                         decoration: BoxDecoration(
                           color: AppColors.avatarDark,
                           borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.borderDark.withValues(alpha: 0.5)),
                         ),
-                        child: Text(
-                          item['symbol'].substring(0, math.min(4, (item['symbol'] as String).length)),
-                          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.white),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: logoUrl != null && logoUrl.isNotEmpty
+                              ? Image.network(
+                                  logoUrl,
+                                  width: 26,
+                                  height: 26,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) => Text(
+                                    item['symbol'].substring(0, math.min(4, (item['symbol'] as String).length)),
+                                    style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.white),
+                                  ),
+                                )
+                              : Text(
+                                  item['symbol'].substring(0, math.min(4, (item['symbol'] as String).length)),
+                                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.white),
+                                ),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -1138,7 +1101,7 @@ class _HomePageState extends State<HomePage> {
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
-                              item['sector'],
+                              subtitleText,
                               style: const TextStyle(fontSize: 9, color: Colors.grey),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -1169,73 +1132,345 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Radar Financeiro (News Cards)
-  Widget _buildNewsSection(bool isDesktop) {
-    List<Map<String, dynamic>> listToDisplay = newsList.isNotEmpty ? newsList : defaultNewsList;
+  void _showArticleModal(BuildContext context, Map<String, dynamic> item) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        String imageUrl = (item['image'] as String?)?.trim() ?? '';
 
-    if (isDesktop) {
-      return Row(
-        children: listToDisplay.take(2).map((item) {
-          return Expanded(
-            child: Container(
-              height: 190,
-              margin: const EdgeInsets.only(right: 12),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
-                image: DecorationImage(
-                  image: NetworkImage(item['image']),
-                  fit: BoxFit.cover,
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 640),
+            decoration: BoxDecoration(
+              color: AppColors.cardDark,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.borderDark),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  blurRadius: 20,
+                  spreadRadius: 4,
                 ),
-              ),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.black.withValues(alpha: 0.92),
-                      Colors.black.withValues(alpha: 0.3),
-                    ],
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                  ),
-                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: SingleChildScrollView(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: item['badgeColor'] ?? AppColors.primaryBlue,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        item['badge'] ?? 'NOTÍCIA',
-                        style: const TextStyle(fontSize: 10, color: AppColors.white, fontWeight: FontWeight.bold),
-                      ),
+                    // Header Image & Close Button
+                    Stack(
+                      children: [
+                        Container(
+                          height: 220,
+                          width: double.infinity,
+                          color: AppColors.avatarDark,
+                          child: imageUrl.isNotEmpty
+                              ? Image.network(
+                                  imageUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Center(
+                                    child: Icon(Icons.newspaper_outlined, size: 50, color: Colors.white24),
+                                  ),
+                                )
+                              : const Center(
+                                  child: Icon(Icons.newspaper_outlined, size: 50, color: Colors.white24),
+                                ),
+                        ),
+                        Positioned.fill(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.85),
+                                  Colors.transparent,
+                                ],
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 12,
+                          right: 12,
+                          child: CircleAvatar(
+                            backgroundColor: Colors.black54,
+                            radius: 18,
+                            child: IconButton(
+                              padding: EdgeInsets.zero,
+                              icon: const Icon(Icons.close, size: 20, color: Colors.white),
+                              onPressed: () => Navigator.pop(context),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 14,
+                          left: 16,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: item['badgeColor'] ?? AppColors.primaryBlue,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              item['badge'] ?? 'NOTÍCIA',
+                              style: const TextStyle(fontSize: 10, color: AppColors.white, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      item['title'],
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.white,
-                        height: 1.3,
+
+                    // Article Content Body
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item['title'] ?? '',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.white,
+                              height: 1.35,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              const Icon(Icons.business_center_outlined, size: 14, color: Colors.grey),
+                              const SizedBox(width: 6),
+                              Text(
+                                item['source'] ?? 'Mercado Financeiro',
+                                style: const TextStyle(fontSize: 11, color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          const Divider(color: AppColors.borderDark),
+                          const SizedBox(height: 12),
+                          Text(
+                            (item['description'] as String?)?.isNotEmpty == true
+                                ? item['description']
+                                : item['title'],
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[300],
+                              height: 1.6,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text(
+                                  'Concluído',
+                                  style: TextStyle(color: AppColors.blueAccent, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      item['source'] ?? '',
-                      style: TextStyle(fontSize: 10, color: Colors.grey[400]),
                     ),
                   ],
                 ),
               ),
             ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSingleNewsCard(Map<String, dynamic> item, {double? width}) {
+    String imageUrl = (item['image'] as String?)?.trim() ?? '';
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => NewsDetailPage(
+              newsItem: item,
+              allNews: newsList,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        width: width,
+        height: 190,
+        margin: const EdgeInsets.only(right: 12),
+        decoration: BoxDecoration(
+          color: AppColors.cardDark,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.borderDark),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: Stack(
+            children: [
+              // 1. Dynamic News Thumbnail Image with Loading & Error Handlers
+              Positioned.fill(
+                child: imageUrl.isNotEmpty
+                    ? Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            color: AppColors.cardDark,
+                            child: const Center(
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.primaryBlue,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  AppColors.primaryBlue.withValues(alpha: 0.5),
+                                  AppColors.cardDark,
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.newspaper_outlined,
+                                size: 44,
+                                color: Colors.white24,
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                    : Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.primaryBlue.withValues(alpha: 0.5),
+                              AppColors.cardDark,
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.newspaper_outlined,
+                            size: 44,
+                            color: Colors.white24,
+                          ),
+                        ),
+                      ),
+              ),
+
+              // 2. Dark Gradient Overlay for optimal text readability
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.black.withValues(alpha: 0.94),
+                        Colors.black.withValues(alpha: 0.25),
+                      ],
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                    ),
+                  ),
+                ),
+              ),
+
+              // 3. News Card Content (Badge, Title, Source)
+              Positioned.fill(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: item['badgeColor'] ?? AppColors.primaryBlue,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          item['badge'] ?? 'NOTÍCIA',
+                          style: const TextStyle(fontSize: 10, color: AppColors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        item['title'] ?? '',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.white,
+                          height: 1.3,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        item['source'] ?? '',
+                        style: TextStyle(fontSize: 10, color: Colors.grey[400]),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Radar Financeiro (News Cards)
+  Widget _buildNewsSection(bool isDesktop) {
+    if (newsList.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: AppColors.cardDark,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.borderDark),
+        ),
+        child: const Center(
+          child: Text(
+            'Aguardando atualização das notícias de fontes oficiais...',
+            style: TextStyle(color: Colors.grey, fontSize: 12),
+          ),
+        ),
+      );
+    }
+
+    if (isDesktop) {
+      return Row(
+        children: newsList.take(2).map((item) {
+          return Expanded(
+            child: _buildSingleNewsCard(item),
           );
         }).toList(),
       );
@@ -1245,69 +1480,10 @@ class _HomePageState extends State<HomePage> {
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           physics: const BouncingScrollPhysics(),
-          itemCount: listToDisplay.length,
+          itemCount: newsList.length,
           itemBuilder: (context, index) {
-            var item = listToDisplay[index];
-
-            return Container(
-              width: MediaQuery.of(context).size.width * 0.8,
-              margin: const EdgeInsets.only(right: 12),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
-                image: DecorationImage(
-                  image: NetworkImage(item['image']),
-                  fit: BoxFit.cover,
-                ),
-              ),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.black.withOpacity(0.92),
-                      Colors.black.withOpacity(0.3),
-                    ],
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: item['badgeColor'] ?? const Color(0xFF2563EB),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        item['badge'] ?? 'NOTÍCIA',
-                        style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      item['title'],
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        height: 1.3,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      item['source'] ?? '',
-                      style: TextStyle(fontSize: 10, color: Colors.grey[400]),
-                    ),
-                  ],
-                ),
-              ),
-            );
+            var item = newsList[index];
+            return _buildSingleNewsCard(item, width: MediaQuery.of(context).size.width * 0.8);
           },
         ),
       );
@@ -1557,7 +1733,19 @@ class _HomePageState extends State<HomePage> {
           }),
           _buildNavItem(Icons.search, 'Buscar', isSearchOpen, _toggleSearch),
           _buildNavItem(FontAwesomeIcons.wallet, 'Carteira', false, navigateToWalletPage),
-          _buildNavItem(FontAwesomeIcons.newspaper, 'Notícias', false, navigateToWalletPage),
+          _buildNavItem(FontAwesomeIcons.newspaper, 'Notícias', false, () {
+            if (newsList.isNotEmpty) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => NewsDetailPage(
+                    newsItem: newsList.first,
+                    allNews: newsList,
+                  ),
+                ),
+              );
+            }
+          }),
           _buildNavItem(FontAwesomeIcons.chartLine, 'Gráfico', false, navigateToBtcPage),
         ],
       ),
