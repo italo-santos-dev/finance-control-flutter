@@ -31,6 +31,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
   String _selectedChartPeriod = '1A';
   String _selectedDividendPeriod = '5A';
 
+  bool _isLoadingChart = true;
   final TextEditingController _searchController = TextEditingController();
   bool _isSearchOpen = false;
   String _searchText = '';
