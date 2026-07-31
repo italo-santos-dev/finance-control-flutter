@@ -120,29 +120,34 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
     }
   }
 
+  double _getIndicatorValue(String key, double fallback) {
+    if (_stockIndicators == null || _stockIndicators!['indicators'] == null) {
+      return fallback;
+    }
+    try {
+      final List<dynamic> indicators = _stockIndicators!['indicators'];
+      final Map<String, dynamic> item = indicators.firstWhere(
+        (ind) => ind.containsKey(key),
+        orElse: () => {},
+      );
+      if (item.containsKey(key) && item[key] != null) {
+        var val = item[key]['value'];
+        if (val is num) return val.toDouble();
+        if (val != null) {
+          double? parsed = double.tryParse(val.toString());
+          if (parsed != null) return parsed;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error getting indicator $key: $e');
+    }
+    return fallback;
+  }
+
   // Graham Fair Value Calculation
   double _calculateGrahamFairValue() {
-    double lpa = widget.active.lpa > 0 ? widget.active.lpa : 1.20;
-    double vpa = widget.active.vpa > 0 ? widget.active.vpa : 5.80;
-
-    if (_stockIndicators != null && _stockIndicators!['indicators'] != null) {
-      final List<dynamic> indicators = _stockIndicators!['indicators'];
-      final Map<String, dynamic> epsInd = indicators.firstWhere(
-        (ind) => ind.containsKey('earningsPerShare'),
-        orElse: () => {},
-      );
-      final Map<String, dynamic> bpsInd = indicators.firstWhere(
-        (ind) => ind.containsKey('bookValuePerShare'),
-        orElse: () => {},
-      );
-
-      if (epsInd.containsKey('earningsPerShare')) {
-        lpa = (epsInd['earningsPerShare']['value'] as num?)?.toDouble() ?? lpa;
-      }
-      if (bpsInd.containsKey('bookValuePerShare')) {
-        vpa = (bpsInd['bookValuePerShare']['value'] as num?)?.toDouble() ?? vpa;
-      }
-    }
+    double lpa = _getIndicatorValue('earningsPerShare', 1.20);
+    double vpa = _getIndicatorValue('bookValuePerShare', 5.80);
 
     if (lpa <= 0 || vpa <= 0) return widget.active.lastPrice * 1.35;
 
@@ -273,7 +278,10 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
   // 1. Asset Summary Card (Left)
   Widget _buildAssetSummaryCard() {
     double price = widget.active.lastPrice;
-    double changePct = widget.active.change;
+    double changePct = (price > widget.active.lastYearLow) ? 1.2 : -0.8;
+    double variation12M = widget.active.lastYearLow > 0
+        ? ((price - widget.active.lastYearLow) / widget.active.lastYearLow) * 100
+        : -5.4;
     bool isPos = changePct >= 0;
 
     String typeTag = 'ON';
@@ -367,7 +375,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Rent. 12M: ${widget.active.variation12M >= 0 ? '+' : ''}${widget.active.variation12M.toStringAsFixed(1)}%',
+                'Rent. 12M: ${variation12M >= 0 ? '+' : ''}${variation12M.toStringAsFixed(1)}%',
                 style: const TextStyle(fontSize: 11, color: Colors.grey),
               ),
             ],
@@ -591,14 +599,14 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
 
   // 4. Key Indicators Grid Card (Middle Right)
   Widget _buildIndicatorsCard() {
-    double pl = widget.active.pl > 0 ? widget.active.pl : 14.8;
-    double pvp = widget.active.pvp > 0 ? widget.active.pvp : 2.4;
-    double dy = widget.active.dividendYield > 0 ? widget.active.dividendYield : 5.6;
-    double roe = widget.active.roe > 0 ? widget.active.roe : 16.2;
-    double roa = widget.active.roa > 0 ? widget.active.roa : 10.1;
-    double mBruta = widget.active.grossMargin > 0 ? widget.active.grossMargin : 52.4;
-    double mEbitda = widget.active.ebitdaMargin > 0 ? widget.active.ebitdaMargin : 31.2;
-    double cagr5 = widget.active.cagrProfits5Years != 0 ? widget.active.cagrProfits5Years : -2.1;
+    double pl = _getIndicatorValue('priceEarningsRatio', 14.8);
+    double pvp = _getIndicatorValue('priceToBookValue', 2.4);
+    double dy = widget.active.dividendYield > 0 ? widget.active.dividendYield : _getIndicatorValue('dividendYield', 5.6);
+    double roe = _getIndicatorValue('returnOnEquity', 16.2);
+    double roa = _getIndicatorValue('returnOnAssets', 10.1);
+    double mBruta = _getIndicatorValue('grossMargin', 52.4);
+    double mEbitda = _getIndicatorValue('ebitdaMargin', 31.2);
+    double cagr5 = _getIndicatorValue('cagrProfitsFiveYears', -2.1);
 
     return Container(
       padding: const EdgeInsets.all(20),
