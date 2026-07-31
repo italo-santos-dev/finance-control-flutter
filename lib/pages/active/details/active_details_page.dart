@@ -31,7 +31,9 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
   String _selectedChartPeriod = '1A';
   String _selectedDividendPeriod = '5A';
 
-  bool _isLoadingChart = true;
+  final TextEditingController _searchController = TextEditingController();
+  bool _isSearchOpen = false;
+  String _searchText = '';
 
   @override
   void initState() {
@@ -201,52 +203,121 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
   // Top App Bar
   Widget _buildTopNavigationHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: const BoxDecoration(
         color: AppColors.headerDark,
-        border: Border(bottom: BorderSide(color: AppColors.borderHeader)),
+        border: Border(bottom: BorderSide(color: AppColors.borderHeader, width: 1.0)),
       ),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
-            onPressed: () => Navigator.pop(context),
-          ),
-          const SizedBox(width: 8),
-          Image.asset(AppIcons.logo_icon_02, height: 14),
-          const SizedBox(width: 6),
-          const Text(
-            'WORTHY',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 0.8),
-          ),
-          const SizedBox(width: 24),
-
-          // Search Bar
-          Expanded(
-            child: Container(
-              height: 38,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: AppColors.cardDark,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.borderDark),
+          // 1. Back button + Logo + 'worthy' (Identical to Home)
+          Row(
+            children: [
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                onPressed: () => Navigator.pop(context),
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.search, size: 16, color: Colors.grey),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Buscar ativos ou relatórios...',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[400]),
-                  ),
-                ],
+              const SizedBox(width: 10),
+              Image.asset(
+                AppIcons.logo_icon_02,
+                height: 13,
+                fit: BoxFit.contain,
               ),
-            ),
+              const SizedBox(width: 5),
+              const Text(
+                'worthy',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.white,
+                  letterSpacing: 0.5,
+                  height: 1.0,
+                ),
+              ),
+            ],
           ),
           const SizedBox(width: 16),
 
+          // 2. Expandable Search Input Bar (Center)
+          Expanded(
+            child: _isSearchOpen
+                ? Container(
+                    height: 38,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.cardDark,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.primaryBlue),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.search, size: 16, color: AppColors.primaryBlue),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            autofocus: true,
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                            decoration: const InputDecoration(
+                              hintText: 'Buscar ativos...',
+                              hintStyle: TextStyle(color: Colors.grey, fontSize: 12),
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(vertical: 8),
+                            ),
+                            onChanged: (val) {
+                              setState(() {
+                                _searchText = val;
+                              });
+                            },
+                          ),
+                        ),
+                        if (_searchController.text.isNotEmpty)
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _searchController.clear();
+                                _searchText = '';
+                              });
+                            },
+                            child: const Icon(Icons.close, size: 16, color: Colors.grey),
+                          ),
+                      ],
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+          const SizedBox(width: 12),
+
+          // 3. Search Icon next to Bell Icon (Toggles Search Bar)
+          IconButton(
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            icon: Icon(
+              Icons.search,
+              size: 20,
+              color: _isSearchOpen ? AppColors.primaryBlue : Colors.grey,
+            ),
+            onPressed: () {
+              setState(() {
+                _isSearchOpen = !_isSearchOpen;
+                if (!_isSearchOpen) {
+                  _searchController.clear();
+                  _searchText = '';
+                }
+              });
+            },
+            tooltip: 'Buscar ativos',
+          ),
+          const SizedBox(width: 16),
+
+          // 4. Notification Bell Icon
           const Icon(Icons.notifications_none, color: Colors.grey, size: 20),
           const SizedBox(width: 16),
+
+          // 5. Help / Info Icon
           const Icon(Icons.help_outline, color: Colors.grey, size: 20),
         ],
       ),
