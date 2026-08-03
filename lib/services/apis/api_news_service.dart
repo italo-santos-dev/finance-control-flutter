@@ -230,4 +230,24 @@ class FinancialNewsService {
 
     return combinedNews;
   }
+
+  /// Fetch news items filtered or prioritized for a specific asset (symbol or company name)
+  Future<List<Map<String, dynamic>>> fetchNewsForAsset(String symbol, String name) async {
+    List<Map<String, dynamic>> allNews = await fetchCombinedNews();
+    String sym = symbol.toUpperCase().trim();
+    String company = name.toUpperCase().trim();
+
+    List<Map<String, dynamic>> matching = allNews.where((news) {
+      String title = (news['title'] ?? '').toString().toUpperCase();
+      String desc = (news['description'] ?? '').toString().toUpperCase();
+      return title.contains(sym) || title.contains(company) || desc.contains(sym) || desc.contains(company);
+    }).toList();
+
+    if (matching.isNotEmpty) {
+      return matching;
+    }
+
+    // Return all B3 / market news if no specific ticker match is found
+    return allNews;
+  }
 }
