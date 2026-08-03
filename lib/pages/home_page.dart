@@ -108,7 +108,7 @@ class _HomePageState extends State<HomePage> {
       _createInterstitialAd();
     });
 
-    // Immediate initial sync for global market cards to eliminate any empty state
+    // Initial sync for global market cards from live APIs
     globalStocksRepo.getProcessedGlobalMarketCards().then((processed) {
       if (mounted) {
         setState(() {
@@ -232,13 +232,13 @@ class _HomePageState extends State<HomePage> {
         return (b['rawPrice'] as double).compareTo(a['rawPrice'] as double);
       });
 
-      if (mounted) {
+      if (mounted && loaded.isNotEmpty) {
         setState(() {
           stockIndicators = loaded;
           filteredStocks = stockIndicators;
-          emAltaList = emAltaTemp.take(3).toList();
-          emBaixaList = emBaixaTemp.take(3).toList();
-          maisNegociadosList = maisNegociadosTemp.take(3).toList();
+          if (emAltaTemp.isNotEmpty) emAltaList = emAltaTemp.take(3).toList();
+          if (emBaixaTemp.isNotEmpty) emBaixaList = emBaixaTemp.take(3).toList();
+          if (maisNegociadosTemp.isNotEmpty) maisNegociadosList = maisNegociadosTemp.take(3).toList();
           isLoading = false;
         });
       }

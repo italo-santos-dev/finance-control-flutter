@@ -79,15 +79,6 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
         }
       }
 
-      if (spots.isEmpty) {
-        // Generate realistic spots based on last price
-        double base = widget.active.lastPrice;
-        spots = List.generate(12, (index) {
-          double varRatio = 0.94 + (sin(index * 0.5) * 0.08) + (index * 0.008);
-          return FlSpot(index.toDouble(), base * varRatio);
-        });
-      }
-
       if (mounted) {
         setState(() {
           _priceChartSpots = spots;
@@ -97,12 +88,8 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
     } catch (e) {
       debugPrint('Error fetching chart data: $e');
       if (mounted) {
-        double base = widget.active.lastPrice;
         setState(() {
-          _priceChartSpots = List.generate(12, (index) {
-            double varRatio = 0.94 + (sin(index * 0.5) * 0.08) + (index * 0.008);
-            return FlSpot(index.toDouble(), base * varRatio);
-          });
+          _priceChartSpots = [];
           _isLoadingChart = false;
         });
       }
@@ -592,7 +579,14 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
             height: 240,
             child: _isLoadingChart
                 ? const Center(child: CircularProgressIndicator(color: AppColors.primaryBlue))
-                : LineChart(_buildChartDataConfig()),
+                : _priceChartSpots.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'Cotação histórica indisponível no momento.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      )
+                    : LineChart(_buildChartDataConfig()),
           ),
         ],
       ),
@@ -600,11 +594,6 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
   }
 
   LineChartData _buildChartDataConfig() {
-    if (_priceChartSpots.isEmpty) {
-      double b = widget.active.lastPrice;
-      _priceChartSpots = [FlSpot(0, b * 0.9), FlSpot(1, b * 1.05), FlSpot(2, b)];
-    }
-
     double minY = _priceChartSpots.map((s) => s.y).reduce(min);
     double maxY = _priceChartSpots.map((s) => s.y).reduce(max);
     double margin = (maxY - minY) * 0.15;
