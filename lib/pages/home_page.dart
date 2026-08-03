@@ -82,10 +82,24 @@ class _HomePageState extends State<HomePage> {
 
   bool isSearchActive = false;
   final FocusNode _searchFocusNode = FocusNode();
-
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounceTimer;
+  bool _isNavigating = false;
+
   late Timer _timer;
   bool isLoading = true;
+
+  void _resetSearchState() {
+    if (!mounted) return;
+    _searchDebounceTimer?.cancel();
+    setState(() {
+      isSearchActive = false;
+      _searchController.clear();
+      searchText = '';
+      filteredStocks = stockIndicators;
+      _searchFocusNode.unfocus();
+    });
+  }
 
   void _toggleSearch() {
     setState(() {
@@ -93,11 +107,30 @@ class _HomePageState extends State<HomePage> {
       if (isSearchActive) {
         _searchFocusNode.requestFocus();
       } else {
-        _searchController.clear();
-        searchText = '';
-        filteredStocks = stockIndicators;
-        _searchFocusNode.unfocus();
+        _resetSearchState();
       }
+    });
+  }
+
+  void _onSearchQueryChanged(String value) {
+    _searchDebounceTimer?.cancel();
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 200), () {
+      if (!mounted) return;
+      setState(() {
+        String query = value.trim().toUpperCase();
+        searchText = query;
+        if (query.isEmpty) {
+          filteredStocks = stockIndicators;
+        } else {
+          filteredStocks = stockIndicators
+              .where((active) =>
+                  active.symbol.toUpperCase().contains(query) ||
+                  active.name.toUpperCase().contains(query) ||
+                  active.sector.toUpperCase().contains(query) ||
+                  active.segment.toUpperCase().contains(query))
+              .toList();
+        }
+      });
     });
   }
 
@@ -127,6 +160,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _timer.cancel();
+    _searchDebounceTimer?.cancel();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
@@ -426,13 +460,7 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               TextButton.icon(
-                onPressed: () {
-                  setState(() {
-                    _searchController.clear();
-                    searchText = '';
-                    filteredStocks = stockIndicators;
-                  });
-                },
+                onPressed: _resetSearchState,
                 icon: const Icon(Icons.close, size: 14, color: AppColors.blueAccent),
                 label: const Text('Limpar busca', style: TextStyle(color: AppColors.blueAccent, fontSize: 12)),
               ),
@@ -566,18 +594,7 @@ class _HomePageState extends State<HomePage> {
                       child: TextField(
                         controller: _searchController,
                         focusNode: _searchFocusNode,
-                        onChanged: (value) {
-                          setState(() {
-                            searchText = value.trim().toUpperCase();
-                            filteredStocks = stockIndicators
-                                .where((active) =>
-                                    active.symbol.toUpperCase().contains(searchText) ||
-                                    active.name.toUpperCase().contains(searchText) ||
-                                    active.sector.toUpperCase().contains(searchText) ||
-                                    active.segment.toUpperCase().contains(searchText))
-                                .toList();
-                          });
-                        },
+                        onChanged: _onSearchQueryChanged,
                         style: const TextStyle(color: AppColors.white, fontSize: 12),
                         decoration: const InputDecoration(
                           hintText: 'Buscar ativos ou relatórios...',
@@ -1778,13 +1795,25 @@ class _HomePageState extends State<HomePage> {
   }
 
   // Navigation & Ad Handlers
-  showDetails(Active active) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ActiveDetailsPage(active: active),
-      ),
-    );
+  void showDetails(Active active) async {
+    if (_isNavigating) return;
+    _isNavigating = true;
+    _searchFocusNode.unfocus();
+
+    try {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ActiveDetailsPage(active: active),
+        ),
+      );
+    } finally {
+      _isNavigating = false;
+      // Mandatory requirement: Automatically close search & reset Home state upon return
+      if (mounted) {
+        _resetSearchState();
+      }
+    }
   }
 
   navigateToBtcPage() {
