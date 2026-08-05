@@ -47,6 +47,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
 
   final TextEditingController _searchController = TextEditingController();
   bool _isSearchOpen = false;
+  String _searchText = '';
 
   @override
   void initState() {
@@ -480,7 +481,7 @@ class _ActiveDetailsPageState extends State<ActiveDetailsPage> {
                 child: _buildActionButton(
                   icon: _isFavorite ? Icons.star : Icons.star_border,
                   label: _isFavorite ? 'Favoritado' : 'Favoritar',
-                  color: _isFavorite ? AppColors.yellowStar : Colors.grey,
+                  color: _isFavorite ? Colors.amber : Colors.grey,
                   onTap: () {
                     setState(() => _isFavorite = !_isFavorite);
                     ScaffoldMessenger.of(context).showSnackBar(
