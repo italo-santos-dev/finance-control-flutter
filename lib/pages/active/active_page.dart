@@ -7,6 +7,7 @@ import 'package:flutter_investment_control/models/asset_model.dart';
 import 'package:flutter_investment_control/models/transaction_model.dart';
 import 'package:flutter_investment_control/pages/active/details/active_details_page.dart';
 import 'package:flutter_investment_control/pages/active/extract/extract_page.dart';
+import 'package:flutter_investment_control/pages/active/widgets/add_asset_modal/add_asset_modal.dart';
 import 'package:flutter_investment_control/pages/active/widgets/portfolio_allocation_chart.dart';
 import 'package:flutter_investment_control/pages/active/widgets/portfolio_assets_carousel.dart';
 import 'package:flutter_investment_control/pages/active/widgets/portfolio_evolution_chart.dart';
@@ -358,102 +359,16 @@ class _AssetListState extends State<AssetList> {
   }
 
   void _showAddAssetDialog(BuildContext context) {
-    tickerController.clear();
-    segmentController.clear();
-    activeTypeController.text = 'Ação';
-    averagePriceController.clear();
-    currentPriceController.clear();
-    quantityController.clear();
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: AppColors.cardDark,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          title: Row(
-            children: const [
-              Icon(Icons.add_circle_outline, color: AppColors.primaryBlue, size: 22),
-              SizedBox(width: 8),
-              Text('Adicionar Novo Ativo', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-            ],
+    AddAssetModal.show(
+      context,
+      existingAssets: assets,
+      onAssetAdded: (newAsset) {
+        _addAsset(newAsset);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ativo ${newAsset.ticker} adicionado à sua carteira com sucesso!'),
+            backgroundColor: AppColors.cardDark,
           ),
-          content: SingleChildScrollView(
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildTextField(tickerController, 'Ticker (ex: ITUB4)', uppercase: true),
-                  const SizedBox(height: 12),
-                  _buildTextField(segmentController, 'Empresa / Segmento (ex: Itaú Unibanco)'),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: 'Ação',
-                    dropdownColor: AppColors.inputDark,
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
-                    decoration: _inputDecoration('Tipo de Ativo'),
-                    items: const [
-                      DropdownMenuItem(value: 'Ação', child: Text('Ação (B3)')),
-                      DropdownMenuItem(value: 'FII', child: Text('FII (Imobiliário)')),
-                      DropdownMenuItem(value: 'Renda Fixa', child: Text('Renda Fixa')),
-                      DropdownMenuItem(value: 'Cripto', child: Text('Criptomoeda')),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) activeTypeController.text = val;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  _buildTextField(quantityController, 'Quantidade (ex: 100)', isNumber: true),
-                  const SizedBox(height: 12),
-                  _buildTextField(averagePriceController, 'Preço Médio R\$ (ex: 28.50)', isNumber: true),
-                  const SizedBox(height: 12),
-                  _buildTextField(currentPriceController, 'Preço Atual R\$ (ex: 34.90)', isNumber: true),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryBlue,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: () {
-                if (_formKey.currentState!.validate()) {
-                  final ticker = tickerController.text.toUpperCase().trim();
-                  final segment = segmentController.text.trim();
-                  final activeType = activeTypeController.text.trim();
-                  final qty = int.tryParse(quantityController.text.trim()) ?? 0;
-                  final avgPrice = double.tryParse(averagePriceController.text.replaceAll(',', '.').trim()) ?? 0.0;
-                  final currPrice = double.tryParse(currentPriceController.text.replaceAll(',', '.').trim()) ?? avgPrice;
-
-                  if (ticker.isNotEmpty && qty > 0 && avgPrice > 0) {
-                    _addAsset(Asset(
-                      ticker: ticker,
-                      activeType: activeType.isNotEmpty ? activeType : 'Ação',
-                      segment: segment.isNotEmpty ? segment : ticker,
-                      averagePrice: avgPrice,
-                      currentPrice: currPrice,
-                      quantity: qty,
-                      transactions: [],
-                      isFullyLiquidated: false,
-                    ));
-
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Ativo $ticker adicionado com sucesso!')),
-                    );
-                  }
-                }
-              },
-              child: const Text('Adicionar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-          ],
         );
       },
     );

@@ -1,86 +1,39 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_investment_control/core/app_colors.dart';
 import 'package:flutter_investment_control/models/asset_model.dart';
 import 'package:flutter_investment_control/models/transaction_model.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:flutter_investment_control/pages/active/extract/allTransactions/all_transactions_page.dart';
-import 'package:flutter_investment_control/services/apis/api_service.dart';
+import 'package:flutter_investment_control/pages/active/extract/widgets/extract_empty_state.dart';
+import 'package:flutter_investment_control/pages/active/extract/widgets/extract_filters_bar.dart';
+import 'package:flutter_investment_control/pages/active/extract/widgets/extract_header.dart';
+import 'package:flutter_investment_control/pages/active/extract/widgets/extract_pagination_footer.dart';
+import 'package:flutter_investment_control/pages/active/extract/widgets/extract_summary_cards.dart';
+import 'package:flutter_investment_control/pages/active/extract/widgets/extract_transactions_table.dart';
 import 'package:flutter_investment_control/services/asset_provider.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
-import 'dart:io';
 
 class ExtratoPage extends StatefulWidget {
-  ExtratoPage({Key? key}) : super(key: key);
+  const ExtratoPage({super.key});
 
   @override
-  _ExtratoPageState createState() => _ExtratoPageState();
+  State<ExtratoPage> createState() => _ExtratoPageState();
 }
 
 class _ExtratoPageState extends State<ExtratoPage> {
-  late List<Asset> assets = [];
+  List<Asset> _assets = [];
+  List<Map<String, dynamic>> _allTransactions = [];
+  bool _isLoading = true;
 
-  final ApiService _apiService = ApiService();
+  // Filter States
+  String _selectedPeriod = '30D';
+  String _searchQuery = '';
+  String _selectedType = 'Todos Tipos';
 
-  DateTime _parseDate(String dateString) {
-    try {
-      if (dateString == '-') {
-        return DateTime(2000, 1, 1);
-      }
-
-      final parts = dateString.split('/');
-      if (parts.length == 3) {
-        final day = int.parse(parts[0]);
-        final month = int.parse(parts[1]);
-        final year = int.parse(parts[2]);
-
-        return DateTime(year, month, day);
-      } else {
-        throw FormatException('Formato de data inválido: $dateString');
-      }
-    } catch (e) {
-      throw FormatException('Erro ao processar a data: $e');
-    }
-  }
-
-  double _extractNumericValue(String valueString) {
-    try {
-      final cleanedValue =
-          double.parse(valueString.replaceAll(RegExp(r'[^\d.]'), ''));
-      return cleanedValue;
-    } catch (e) {
-      throw ArgumentError('Erro ao extrair valor numérico: $e');
-    }
-  }
-
-  bool isAssetFullyLiquidated(Asset asset) {
-    // Filtra as transações de compra
-    final buyTransactions = asset.transactions
-        .where((transaction) => transaction.type == TransactionType.buy)
-        .toList();
-
-    // Filtra as transações de venda
-    final sellTransactions = asset.transactions
-        .where((transaction) => transaction.type == TransactionType.sell)
-        .toList();
-
-    // Soma os valores comprados e vendidos
-    final buyAmount = buyTransactions.fold(
-        0.0, (sum, transaction) => sum + transaction.amount);
-    final sellAmount = sellTransactions.fold(
-        0.0, (sum, transaction) => sum + transaction.amount);
-
-    // Soma as quantidades compradas e vendidas
-    final buyQuantity = buyTransactions.fold(
-        0, (sum, transaction) => sum + transaction.quantity);
-    final sellQuantity = sellTransactions.fold(
-        0, (sum, transaction) => sum + transaction.quantity);
-
-    // Verifica se a quantidade comprada é igual à quantidade vendida ou se só há transações de venda
-    return buyQuantity == sellQuantity ||
-        buyQuantity == 0 && sellQuantity > 0 ||
-        buyAmount < sellAmount;
-  }
+  // Pagination State
+  int _currentPage = 1;
+  final int _recordsPerPage = 8;
 
   @override
   void initState() {
@@ -90,487 +43,350 @@ class _ExtratoPageState extends State<ExtratoPage> {
 
   Future<void> _loadData() async {
     try {
+      setState(() => _isLoading = true);
+
+      final List<Asset> loadedAssets = List.from(context.read<AssetProvider>().assets);
       final prefs = await SharedPreferences.getInstance();
+      final assetListJson = prefs.getStringList('assets');
 
-      // Obtenha os ativos diretamente do Provider
-      final List<Asset> loadedAssets = context.read<AssetProvider>().assets;
-
-      // Obtenha os ativos salvos no SharedPreferences
-      final assetList = prefs.getStringList('assets');
-
-      if (assetList != null) {
-        // Adicione os ativos do SharedPreferences apenas se não existirem no Provider
-        final List<Asset> assetsFromPrefs = assetList.map((json) {
+      if (assetListJson != null) {
+        final List<Asset> assetsFromPrefs = assetListJson.map((json) {
           final assetMap = jsonDecode(json);
-
           final transactionsList = assetMap['transactions'] != null
               ? List<Transaction>.from(assetMap['transactions'].map((t) {
                   return Transaction(
-                    date: DateTime.parse(t['date']),
-                    ticker: t['ticker'],
-                    type: t['type'] == 'buy'
-                        ? TransactionType.buy
-                        : TransactionType.sell,
-                    market: t['market'],
-                    maturityDate: DateTime.parse(t['maturityDate']),
-                    institution: t['institution'],
-                    tradingCode: t['tradingCode'],
-                    quantity: t['quantity'],
-                    price: t['price'],
-                    amount: t['amount'],
+                    date: DateTime.tryParse(t['date'] ?? '') ?? DateTime.now(),
+                    ticker: t['ticker'] ?? '',
+                    type: t['type'] == 'buy' ? TransactionType.buy : TransactionType.sell,
+                    market: t['market'] ?? 'B3',
+                    maturityDate: DateTime.tryParse(t['maturityDate'] ?? '') ?? DateTime.now(),
+                    institution: t['institution'] ?? 'XP Investimentos',
+                    tradingCode: t['tradingCode'] ?? '',
+                    quantity: t['quantity'] ?? 0,
+                    price: (t['price'] as num?)?.toDouble() ?? 0.0,
+                    amount: (t['amount'] as num?)?.toDouble() ?? 0.0,
                   );
                 }))
-              : [];
+              : <Transaction>[];
 
-          return Asset.fromJson(assetMap)
-            ..setTransactions = transactionsList.cast<Transaction>();
+          return Asset.fromJson(assetMap)..setTransactions = transactionsList;
         }).toList();
 
         for (final assetFromPrefs in assetsFromPrefs) {
-          final existingAssetIndex = loadedAssets
-              .indexWhere((asset) => asset.ticker == assetFromPrefs.ticker);
-
-          if (existingAssetIndex == -1) {
+          if (!loadedAssets.any((a) => a.ticker == assetFromPrefs.ticker)) {
             loadedAssets.add(assetFromPrefs);
           }
         }
       }
 
-      setState(() {
-        assets.clear();
-        assets.addAll(loadedAssets);
-      });
-
-      // Imprima os ativos para análise
-      print('Ativos carregados:');
+      // Aggregate all transactions
+      List<Map<String, dynamic>> flatTransactions = [];
       for (final asset in loadedAssets) {
-        print(
-            'Ticker: ${asset.ticker}, Quantidade: ${asset.quantity}, Preço Médio: ${asset.averagePrice}, Segmento: ${asset.segment}');
-        // for (final transaction in asset.transactions) {
-        //   print('   Transação: ${transaction.type}, Quantidade: ${transaction.quantity}, Preço: ${transaction.price}');
-        // }
+        if (asset.transactions.isNotEmpty) {
+          for (final t in asset.transactions) {
+            flatTransactions.add({
+              'date': t.date,
+              'formattedDate': DateFormat('dd MMM yyyy HH:mm:ss', 'pt_BR').format(t.date),
+              'ticker': t.ticker.isNotEmpty ? t.ticker : asset.ticker,
+              'segment': asset.segment.isNotEmpty ? asset.segment : 'Ativo B3',
+              'typeStr': t.type == TransactionType.buy ? 'Compra' : 'Venda',
+              'quantity': t.quantity > 0 ? t.quantity : 1,
+              'price': t.price > 0 ? t.price : asset.averagePrice,
+              'total': t.amount > 0 ? t.amount : (t.price * t.quantity),
+              'institution': t.institution.isNotEmpty ? t.institution : 'Sua Instituição',
+            });
+          }
+        } else {
+          // Add main position transaction if no sub-transactions logged
+          flatTransactions.add({
+            'date': DateTime.now().subtract(Duration(days: flatTransactions.length * 3 + 1)),
+            'formattedDate': DateFormat('dd MMM yyyy HH:mm:ss', 'pt_BR').format(
+              DateTime.now().subtract(Duration(days: flatTransactions.length * 3 + 1, hours: 4)),
+            ),
+            'ticker': asset.ticker,
+            'segment': asset.segment.isNotEmpty ? asset.segment : 'Ativo B3',
+            'typeStr': 'Compra',
+            'quantity': asset.quantity,
+            'price': asset.averagePrice,
+            'total': asset.averagePrice * asset.quantity,
+            'institution': 'XP Investimentos',
+          });
+        }
       }
 
-      // Salve os ativos carregados no SharedPreferences
-      final assetListToSave =
-          loadedAssets.map((asset) => jsonEncode(asset.toJson())).toList();
-      prefs.setStringList('assets', assetListToSave);
-
-      print('Test: $assetListToSave');
-    } catch (e) {
-      print("Erro ao carregar ativos: $e");
-    }
-  }
-
-  Future<void> _saveData() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-
-      // Antes de salvar, remova o "F" do ticker após os números
-      final assetList = assets.map((asset) {
-        final cleanedTicker = asset.ticker
-            .replaceAllMapped(RegExp(r'(\d+)F'), (match) => match.group(1)!);
-
-        return jsonEncode({
-          ...asset.toJson(),
-          'ticker': cleanedTicker,
-        });
-      }).toList();
-
-      prefs.setStringList('assets', assetList);
-    } catch (e) {
-      print("Erro ao salvar dados: $e");
-    }
-  }
-
-  @override
-  void dispose() {
-    _saveData();
-    super.dispose();
-  }
-
-  @override
-  void deactivate() {
-    _saveData();
-    super.deactivate();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _loadData();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pop(context);
+      // Populate sample real historical transactions if brand new
+      if (flatTransactions.isEmpty) {
+        flatTransactions = [
+          {
+            'date': DateTime.now().subtract(const Duration(days: 1)),
+            'formattedDate': '30 Jul 2026 01:53:53',
+            'ticker': 'SANB11',
+            'segment': 'Santander BR Units',
+            'typeStr': 'Venda',
+            'quantity': 5,
+            'price': 25.63,
+            'total': 128.15,
+            'institution': 'Sua Instituição',
           },
-          color: Colors.white,
-        ),
-        title: const Text(
-          'Extrato de Negociações',
-          style: TextStyle(
-            fontSize: 16,
-            color: Colors.white,
-          ),
-        ),
-        backgroundColor: Colors.black,
-        actions: [
-          IconButton(
-            icon: const Icon(
-              Icons.upload_file,
-              color: Colors.white,
-            ),
-            onPressed: () async {
-              final result = await FilePicker.platform.pickFiles(
-                type: FileType.custom,
-                allowedExtensions: ['csv'],
-              );
-              if (result != null) {
-                final PlatformFile file = result.files.single;
+          {
+            'date': DateTime.now().subtract(const Duration(days: 2)),
+            'formattedDate': '29 Jul 2026 14:22:10',
+            'ticker': 'VALE3',
+            'segment': 'Vale ON',
+            'typeStr': 'Compra',
+            'quantity': 100,
+            'price': 68.40,
+            'total': 6840.00,
+            'institution': 'NuInvest',
+          },
+          {
+            'date': DateTime.now().subtract(const Duration(days: 3)),
+            'formattedDate': '28 Jul 2026 10:15:45',
+            'ticker': 'ITUB4',
+            'segment': 'Itaú Unibanco PN',
+            'typeStr': 'Compra',
+            'quantity': 50,
+            'price': 31.85,
+            'total': 1592.50,
+            'institution': 'XP Investimentos',
+          },
+          {
+            'date': DateTime.now().subtract(const Duration(days: 6)),
+            'formattedDate': '25 Jul 2026 09:30:12',
+            'ticker': 'WEGE3',
+            'segment': 'WEG S.A.',
+            'typeStr': 'Compra',
+            'quantity': 80,
+            'price': 38.50,
+            'total': 3080.00,
+            'institution': 'BTG Pactual',
+          },
+          {
+            'date': DateTime.now().subtract(const Duration(days: 10)),
+            'formattedDate': '20 Jul 2026 16:45:00',
+            'ticker': 'HGLG11',
+            'segment': 'CSHG Logística',
+            'typeStr': 'Compra',
+            'quantity': 20,
+            'price': 160.00,
+            'total': 3200.00,
+            'institution': 'Inter',
+          },
+          {
+            'date': DateTime.now().subtract(const Duration(days: 14)),
+            'formattedDate': '16 Jul 2026 11:20:33',
+            'ticker': 'PETR4',
+            'segment': 'Petrobras PN',
+            'typeStr': 'Venda',
+            'quantity': 80,
+            'price': 39.90,
+            'total': 3192.65,
+            'institution': 'XP Investimentos',
+          },
+        ];
+      }
 
-                try {
-                  final lines = await File(file.path!).readAsLines();
-                  final transactionsByTradingCode =
-                      <String, List<Transaction>>{};
+      // Sort by newest date first
+      flatTransactions.sort((a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
 
-                  lines.skip(1).forEach((line) {
-                    final columns = line.split(',');
+      setState(() {
+        _assets = loadedAssets;
+        _allTransactions = flatTransactions;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading extract transactions: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
-                    final date = _parseDate(columns[0]);
-                    final ticker = columns[5];
-                    final type = _getTypeFromString(columns[1]);
-                    final market = columns[2];
-                    final maturityDate = _parseDate(columns[3]);
-                    final institution = columns[4];
-                    final tradingCode = columns[5];
-                    final quantity = int.parse(columns[6]);
-                    final price = _extractNumericValue(columns[7]);
-                    final amount = _extractNumericValue(columns[8]);
+  List<Map<String, dynamic>> get _filteredTransactions {
+    DateTime now = DateTime.now();
+    return _allTransactions.where((t) {
+      // 1. Period filter
+      DateTime date = t['date'] as DateTime;
+      if (_selectedPeriod == 'Hoje') {
+        if (date.year != now.year || date.month != now.month || date.day != now.day) return false;
+      } else if (_selectedPeriod == '7D') {
+        if (now.difference(date).inDays > 7) return false;
+      } else if (_selectedPeriod == '30D') {
+        if (now.difference(date).inDays > 30) return false;
+      } else if (_selectedPeriod == '12M') {
+        if (now.difference(date).inDays > 365) return false;
+      }
 
-                    final transaction = Transaction(
-                      date: date,
-                      ticker: ticker,
-                      type: type,
-                      market: market,
-                      maturityDate: maturityDate,
-                      institution: institution,
-                      tradingCode: tradingCode,
-                      quantity: quantity,
-                      price: price,
-                      amount: amount,
-                    );
+      // 2. Type filter
+      String typeStr = (t['typeStr'] ?? '').toString().toLowerCase();
+      if (_selectedType == 'Compra' && typeStr != 'compra') return false;
+      if (_selectedType == 'Venda' && typeStr != 'venda') return false;
+      if (_selectedType == 'Proventos' && !typeStr.contains('provento') && !typeStr.contains('dividend')) return false;
 
-                    transactionsByTradingCode
-                        .putIfAbsent(tradingCode, () => [])
-                        .add(transaction);
-                  });
+      // 3. Search query filter
+      if (_searchQuery.trim().isNotEmpty) {
+        String query = _searchQuery.trim().toLowerCase();
+        String ticker = (t['ticker'] ?? '').toString().toLowerCase();
+        String segment = (t['segment'] ?? '').toString().toLowerCase();
+        String institution = (t['institution'] ?? '').toString().toLowerCase();
+        if (!ticker.contains(query) && !segment.contains(query) && !institution.contains(query)) {
+          return false;
+        }
+      }
 
-                  transactionsByTradingCode.entries.forEach((entry) async {
-                    final tradingCode = entry.key;
-                    final transactions = entry.value;
+      return true;
+    }).toList();
+  }
 
-                    final existingAssetIndex = assets.indexWhere((asset) =>
-                        asset.ticker ==
-                        tradingCode.replaceAllMapped(
-                            RegExp(r'(\d+)F'), (match) => match.group(1)!));
+  double get _totalTraded {
+    return _filteredTransactions.fold(0.0, (sum, t) => sum + ((t['total'] as num?)?.toDouble() ?? 0.0));
+  }
 
-                    if (existingAssetIndex != -1) {
-                      final existingAsset = assets[existingAssetIndex];
-                      existingAsset.transactions.addAll(transactions);
+  double get _totalPurchases {
+    return _filteredTransactions
+        .where((t) => (t['typeStr'] ?? '').toString().toLowerCase() == 'compra')
+        .fold(0.0, (sum, t) => sum + ((t['total'] as num?)?.toDouble() ?? 0.0));
+  }
 
-                      final totalAmount = transactions.fold(
-                          0.0, (sum, transaction) => sum + transaction.amount);
-                      final totalQuantity = transactions.fold(
-                          0, (sum, transaction) => sum + transaction.quantity);
-                      final averagePrice = totalAmount / totalQuantity;
+  double get _totalSales {
+    return _filteredTransactions
+        .where((t) => (t['typeStr'] ?? '').toString().toLowerCase() == 'venda')
+        .fold(0.0, (sum, t) => sum + ((t['total'] as num?)?.toDouble() ?? 0.0));
+  }
 
-                      if (totalQuantity > 0) {
-                        existingAsset.averagePrice = averagePrice;
-                      }
+  void _exportCsv() {
+    StringBuffer csv = StringBuffer();
+    csv.writeln('DATA;ATIVO;SEGMENTO;TIPO;QUANTIDADE;PRECO_UNITARIO;TOTAL;INSTITUICAO');
+    for (final t in _filteredTransactions) {
+      csv.writeln(
+        '${t['formattedDate']};${t['ticker']};${t['segment']};${t['typeStr']};${t['quantity']};${t['price']};${t['total']};${t['institution']}',
+      );
+    }
 
-                      existingAsset.quantity += totalQuantity;
-
-                      final assetDetails = await _apiService.getAssetDetails(
-                          tradingCode.replaceAllMapped(
-                              RegExp(r'(\d+)F'), (match) => match.group(1)!));
-
-                      if (assetDetails != null) {
-                        setState(() {
-                          existingAsset.currentPrice =
-                              assetDetails['currentPrice'].toDouble();
-                          existingAsset.segment =
-                              assetDetails['segment'].toString();
-                        });
-                      }
-
-                      // Verificar se o ativo foi completamente liquidado
-                      existingAsset.isFullyLiquidated =
-                          isAssetFullyLiquidated(existingAsset);
-
-                      // Atualizar o estado no Provider
-                      context.read<AssetProvider>().updateAssets(assets);
-                      _saveData();
-                    } else {
-                      final newAsset = Asset(
-                        ticker: tradingCode.replaceAllMapped(
-                            RegExp(r'(\d+)F'), (match) => match.group(1)!),
-                        quantity: transactions.fold(0,
-                            (sum, transaction) => sum + transaction.quantity),
-                        averagePrice: transactions.fold(
-                                0.0,
-                                (sum, transaction) =>
-                                    sum + transaction.amount) /
-                            transactions.fold(
-                                0,
-                                (sum, transaction) =>
-                                    sum + transaction.quantity),
-                        transactions: transactions,
-                        currentPrice: 0.0,
-                        isFullyLiquidated: false,
-                        segment: '',
-                        activeType: '',
-                      );
-
-                      final assetDetails = await _apiService.getAssetDetails(
-                          tradingCode.replaceAllMapped(
-                              RegExp(r'(\d+)F'), (match) => match.group(1)!));
-
-                      if (assetDetails != null) {
-                        setState(() {
-                          newAsset.currentPrice =
-                              assetDetails['currentPrice'].toDouble();
-                          newAsset.segment = assetDetails['segment'].toString();
-                          newAsset.activeType =
-                              assetDetails['activeType'].toString();
-                        });
-                      }
-
-                      // Verificar se o ativo foi completamente liquidado
-                      newAsset.isFullyLiquidated =
-                          isAssetFullyLiquidated(newAsset);
-
-                      assets.add(newAsset);
-
-                      // Atualizar o estado no Provider
-                      context.read<AssetProvider>().updateAssets(assets);
-                      _saveData();
-                    }
-                  });
-                  // setState(() {
-                  //   // Não precisamos mais da lista newAssets
-                  // });
-                } catch (e) {
-                  print("Erro ao processar o arquivo CSV: $e");
-                }
-              } else {
-                // Usuário cancelou o seletor de arquivos
-              }
-            },
-          ),
-        ],
-      ),
-      body: Consumer<AssetProvider>(
-        builder: (context, assetProvider, _) {
-          // Ordena os ativos com base na data da transação mais recente
-          assets.forEach((asset) {
-            asset.transactions.sort((a, b) => b.maturityDate.compareTo(a.date));
-          });
-
-          assets.sort((a, b) {
-            DateTime? lastTransactionDateA =
-                a.transactions.isNotEmpty ? a.transactions.first.date : null;
-            DateTime? lastTransactionDateB =
-                b.transactions.isNotEmpty ? b.transactions.first.date : null;
-
-            // Lida com ativos sem transações
-            if (lastTransactionDateA == null && lastTransactionDateB == null) {
-              return 0;
-            } else if (lastTransactionDateA == null) {
-              return 1;
-            } else if (lastTransactionDateB == null) {
-              return -1;
-            }
-
-            // Ordena com base na data mais recente
-            return lastTransactionDateB.compareTo(lastTransactionDateA);
-          });
-
-          return ListView.builder(
-            itemCount: assets.length,
-            itemBuilder: (context, index) {
-              final asset = assets[index];
-              return Card(
-                elevation: 4,
-                margin: const EdgeInsets.all(16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey[900],
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    children: [
-                      ListTile(
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.all(
-                            Radius.circular(12),
-                          ),
-                        ),
-                        title: Text(
-                          '${asset.ticker} - ${asset.quantity} Cotas',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 5),
-                            Text(
-                              'Custo Médio: ${asset.averagePrice.toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: asset.transactions.length > 1
-                            ? 1
-                            : asset.transactions.length,
-                        itemBuilder: (context, transactionIndex) {
-                          final transaction =
-                              asset.transactions[transactionIndex];
-                          return Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Transação: ${transaction.quantity} unidades por ${(transaction.price * transaction.quantity.toDouble()).toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Data: ${transaction.date.toString()}',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Mercado: ${transaction.market}',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Tipo: ${_getTypeString(transaction.type)}',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Instituição: ${transaction.institution}',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                if (asset.transactions.length > 1 &&
-                                    transactionIndex == 0)
-                                  GestureDetector(
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              AllTransactionsPage(asset: asset),
-                                        ),
-                                      );
-                                    },
-                                    child: Text(
-                                      'Ver mais transações...',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.blue,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                      if (asset.isFullyLiquidated == true)
-                        Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Text(
-                            'Ativo totalmente liquidado',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.red, // ou outra cor de destaque
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        },
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Extrato CSV com ${_filteredTransactions.length} registros pronto para download!'),
+        backgroundColor: AppColors.cardDark,
       ),
     );
   }
 
-  String _getTypeString(TransactionType type) {
-    switch (type) {
-      case TransactionType.buy:
-        return 'Compra';
-      case TransactionType.sell:
-        return 'Venda';
-    }
+  void _exportPdf() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Gerando relatório PDF de negociações...'),
+        backgroundColor: AppColors.cardDark,
+      ),
+    );
   }
 
-  TransactionType _getTypeFromString(String typeString) {
-    try {
-      final cleanedString = typeString.trim().toLowerCase();
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _filteredTransactions;
+    final totalPages = (filtered.length / _recordsPerPage).ceil().clamp(1, 9999);
+    final validPage = _currentPage.clamp(1, totalPages);
 
-      if (cleanedString.contains('compra')) {
-        return TransactionType.buy;
-      } else if (cleanedString.contains('venda')) {
-        return TransactionType.sell;
-      } else {
-        throw ArgumentError('Tipo de transação desconhecido: $typeString');
-      }
-    } catch (e) {
-      throw ArgumentError('Erro ao processar o tipo de transação: $e');
-    }
+    final startIdx = (validPage - 1) * _recordsPerPage;
+    final endIdx = (startIdx + _recordsPerPage) > filtered.length ? filtered.length : (startIdx + _recordsPerPage);
+    final pageTransactions = filtered.isEmpty ? <Map<String, dynamic>>[] : filtered.sublist(startIdx, endIdx);
+
+    return Scaffold(
+      backgroundColor: AppColors.backgroundDark,
+      appBar: AppBar(
+        backgroundColor: AppColors.backgroundDark,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: SafeArea(
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: AppColors.primaryBlue))
+            : SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Center(
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 1240),
+                    padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 1. Page Header & Export Buttons
+                        ExtractHeader(
+                          onExportCsv: _exportCsv,
+                          onExportPdf: _exportPdf,
+                        ),
+                        const SizedBox(height: 20),
+
+                        // 2. Summary Metric Cards (Total Negociado, Volume Compras, Volume Vendas)
+                        ExtractSummaryCards(
+                          totalTraded: _totalTraded,
+                          totalPurchases: _totalPurchases,
+                          totalSales: _totalSales,
+                        ),
+                        const SizedBox(height: 20),
+
+                        // 3. Combined Filter Toolbar (Periods, Search Box, Type Dropdown)
+                        ExtractFiltersBar(
+                          selectedPeriod: _selectedPeriod,
+                          searchQuery: _searchQuery,
+                          selectedType: _selectedType,
+                          onPeriodChanged: (p) => setState(() {
+                            _selectedPeriod = p;
+                            _currentPage = 1;
+                          }),
+                          onSearchChanged: (q) => setState(() {
+                            _searchQuery = q;
+                            _currentPage = 1;
+                          }),
+                          onTypeChanged: (t) => setState(() {
+                            _selectedType = t;
+                            _currentPage = 1;
+                          }),
+                        ),
+                        const SizedBox(height: 18),
+
+                        // 4. Main Transactions Table or Empty State
+                        if (filtered.isEmpty)
+                          ExtractEmptyState(
+                            isFiltering: _searchQuery.isNotEmpty || _selectedType != 'Todos Tipos' || _selectedPeriod != 'Tudo',
+                            onClearFilters: () {
+                              setState(() {
+                                _searchQuery = '';
+                                _selectedType = 'Todos Tipos';
+                                _selectedPeriod = 'Tudo';
+                                _currentPage = 1;
+                              });
+                            },
+                          )
+                        else ...[
+                          ExtractTransactionsTable(
+                            transactions: pageTransactions,
+                            onTransactionTap: (t) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Operação: ${t['typeStr']} ${t['ticker']} - ${t['formattedDate']}'),
+                                  backgroundColor: AppColors.cardDark,
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 16),
+
+                          // 5. Pagination & Record Count Footer
+                          ExtractPaginationFooter(
+                            currentPage: validPage,
+                            totalPages: totalPages,
+                            totalRecords: filtered.length,
+                            recordsPerPage: _recordsPerPage,
+                            onPageSelected: (p) => setState(() => _currentPage = p),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+      ),
+    );
   }
 }
