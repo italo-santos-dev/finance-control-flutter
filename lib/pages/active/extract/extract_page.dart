@@ -29,6 +29,18 @@ class _ExtratoPageState extends State<ExtratoPage> {
   int _currentPage = 1;
   final int _recordsPerPage = 8;
 
+  String _formatDate(DateTime dt) {
+    try {
+      return DateFormat('dd/MM/yyyy HH:mm').format(dt);
+    } catch (_) {
+      final day = dt.day.toString().padLeft(2, '0');
+      final month = dt.month.toString().padLeft(2, '0');
+      final hour = dt.hour.toString().padLeft(2, '0');
+      final min = dt.minute.toString().padLeft(2, '0');
+      return '$day/$month/${dt.year} $hour:$min';
+    }
+  }
+
   List<Map<String, dynamic>> _extractAllTransactions(AssetProvider provider) {
     final List<TradeTransaction> trades = provider.transactions;
     final assets = provider.assets;
@@ -40,7 +52,7 @@ class _ExtratoPageState extends State<ExtratoPage> {
         flatTransactions.add({
           'id': t.id,
           'date': t.date,
-          'formattedDate': DateFormat('dd MMM yyyy HH:mm:ss', 'pt_BR').format(t.date),
+          'formattedDate': _formatDate(t.date),
           'ticker': t.ticker,
           'segment': t.segment.isNotEmpty ? t.segment : (t.name.isNotEmpty ? t.name : 'Ativo B3'),
           'typeStr': t.type == TransactionType.buy ? 'Compra' : 'Venda',
@@ -57,7 +69,7 @@ class _ExtratoPageState extends State<ExtratoPage> {
             flatTransactions.add({
               'id': '${asset.ticker}-${t.date.millisecondsSinceEpoch}',
               'date': t.date,
-              'formattedDate': DateFormat('dd MMM yyyy HH:mm:ss', 'pt_BR').format(t.date),
+              'formattedDate': _formatDate(t.date),
               'ticker': t.ticker.isNotEmpty ? t.ticker : asset.ticker,
               'segment': asset.segment.isNotEmpty ? asset.segment : 'Ativo B3',
               'typeStr': t.type == TransactionType.buy ? 'Compra' : 'Venda',
@@ -68,12 +80,11 @@ class _ExtratoPageState extends State<ExtratoPage> {
             });
           }
         } else {
+          final syntheticDate = DateTime.now().subtract(Duration(days: flatTransactions.length * 3 + 1, hours: 4));
           flatTransactions.add({
             'id': '${asset.ticker}-pos',
-            'date': DateTime.now().subtract(Duration(days: flatTransactions.length * 3 + 1)),
-            'formattedDate': DateFormat('dd MMM yyyy HH:mm:ss', 'pt_BR').format(
-              DateTime.now().subtract(Duration(days: flatTransactions.length * 3 + 1, hours: 4)),
-            ),
+            'date': syntheticDate,
+            'formattedDate': _formatDate(syntheticDate),
             'ticker': asset.ticker,
             'segment': asset.segment.isNotEmpty ? asset.segment : 'Ativo B3',
             'typeStr': 'Compra',
