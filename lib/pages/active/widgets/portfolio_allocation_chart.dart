@@ -6,11 +6,13 @@ import 'package:flutter_investment_control/models/asset_model.dart';
 class PortfolioAllocationChart extends StatelessWidget {
   final List<Asset> assets;
   final double totalPortfolioValue;
+  final bool hideValues;
 
   const PortfolioAllocationChart({
     super.key,
     required this.assets,
     required this.totalPortfolioValue,
+    this.hideValues = false,
   });
 
   @override
@@ -101,15 +103,15 @@ class PortfolioAllocationChart extends StatelessWidget {
                 Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Text(
+                    children: [
+                      const Text(
                         'Total',
                         style: TextStyle(fontSize: 10, color: Colors.grey),
                       ),
-                      SizedBox(height: 2),
+                      const SizedBox(height: 2),
                       Text(
-                        '100%',
-                        style: TextStyle(
+                        hideValues ? '••••' : '100%',
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -150,7 +152,7 @@ class PortfolioAllocationChart extends StatelessWidget {
                       ],
                     ),
                     Text(
-                      '${pct.toStringAsFixed(0)}%',
+                      hideValues ? '••%' : '${pct.toStringAsFixed(0)}%',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
                     ),
                   ],
@@ -170,11 +172,17 @@ class PortfolioAllocationChart extends StatelessWidget {
     }
     for (var a in assets) {
       String cat = a.activeType.toUpperCase();
-      if (cat.contains('FII')) cat = 'FIIs';
-      else if (cat.contains('AÇÃO') || cat.contains('ACAO')) cat = 'Ações';
-      else if (cat.contains('CRIPTO')) cat = 'Cripto';
-      else if (cat.contains('RENDA')) cat = 'Renda Fixa';
-      else cat = 'Outros';
+      if (cat.contains('FII')) {
+        cat = 'FIIs';
+      } else if (cat.contains('AÇÃO') || cat.contains('ACAO')) {
+        cat = 'Ações';
+      } else if (cat.contains('CRIPTO')) {
+        cat = 'Cripto';
+      } else if (cat.contains('RENDA')) {
+        cat = 'Renda Fixa';
+      } else {
+        cat = 'Outros';
+      }
 
       map[cat] = (map[cat] ?? 0.0) + a.totalAmount;
     }

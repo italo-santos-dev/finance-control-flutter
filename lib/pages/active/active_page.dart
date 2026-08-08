@@ -431,6 +431,7 @@ class _AssetListState extends State<AssetList> {
             backgroundColor: AppColors.cardDark,
           ),
         );
+        setState(() {});
       },
     );
   }

@@ -24,7 +24,7 @@ class _ExtratoPageState extends State<ExtratoPage> {
   bool _isLoading = true;
 
   // Filter States
-  String _selectedPeriod = '30D';
+  String _selectedPeriod = 'Tudo';
   String _searchQuery = '';
   String _selectedType = 'Todos Tipos';
 
