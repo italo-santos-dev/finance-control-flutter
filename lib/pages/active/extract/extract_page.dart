@@ -1,7 +1,6 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_investment_control/core/app_colors.dart';
-import 'package:flutter_investment_control/models/asset_model.dart';
+import 'package:flutter_investment_control/models/trade_transaction.dart';
 import 'package:flutter_investment_control/models/transaction_model.dart';
 import 'package:flutter_investment_control/pages/active/extract/widgets/extract_empty_state.dart';
 import 'package:flutter_investment_control/pages/active/extract/widgets/extract_filters_bar.dart';
@@ -12,7 +11,6 @@ import 'package:flutter_investment_control/pages/active/extract/widgets/extract_
 import 'package:flutter_investment_control/services/asset_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class ExtratoPage extends StatefulWidget {
   const ExtratoPage({super.key});
@@ -22,7 +20,6 @@ class ExtratoPage extends StatefulWidget {
 }
 
 class _ExtratoPageState extends State<ExtratoPage> {
-  List<Asset> _assets = [];
   List<Map<String, dynamic>> _allTransactions = [];
   bool _isLoading = true;
 
@@ -41,159 +38,78 @@ class _ExtratoPageState extends State<ExtratoPage> {
     _loadData();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadData();
+  }
+
   Future<void> _loadData() async {
     try {
-      setState(() => _isLoading = true);
+      final provider = context.read<AssetProvider>();
+      final List<TradeTransaction> trades = provider.transactions;
+      final assets = provider.assets;
 
-      final List<Asset> loadedAssets = List.from(context.read<AssetProvider>().assets);
-      final prefs = await SharedPreferences.getInstance();
-      final assetListJson = prefs.getStringList('assets');
-
-      if (assetListJson != null) {
-        final List<Asset> assetsFromPrefs = assetListJson.map((json) {
-          final assetMap = jsonDecode(json);
-          final transactionsList = assetMap['transactions'] != null
-              ? List<Transaction>.from(assetMap['transactions'].map((t) {
-                  return Transaction(
-                    date: DateTime.tryParse(t['date'] ?? '') ?? DateTime.now(),
-                    ticker: t['ticker'] ?? '',
-                    type: t['type'] == 'buy' ? TransactionType.buy : TransactionType.sell,
-                    market: t['market'] ?? 'B3',
-                    maturityDate: DateTime.tryParse(t['maturityDate'] ?? '') ?? DateTime.now(),
-                    institution: t['institution'] ?? 'XP Investimentos',
-                    tradingCode: t['tradingCode'] ?? '',
-                    quantity: t['quantity'] ?? 0,
-                    price: (t['price'] as num?)?.toDouble() ?? 0.0,
-                    amount: (t['amount'] as num?)?.toDouble() ?? 0.0,
-                  );
-                }))
-              : <Transaction>[];
-
-          return Asset.fromJson(assetMap)..setTransactions = transactionsList;
-        }).toList();
-
-        for (final assetFromPrefs in assetsFromPrefs) {
-          if (!loadedAssets.any((a) => a.ticker == assetFromPrefs.ticker)) {
-            loadedAssets.add(assetFromPrefs);
-          }
-        }
-      }
-
-      // Aggregate all transactions
       List<Map<String, dynamic>> flatTransactions = [];
-      for (final asset in loadedAssets) {
-        if (asset.transactions.isNotEmpty) {
-          for (final t in asset.transactions) {
-            flatTransactions.add({
-              'date': t.date,
-              'formattedDate': DateFormat('dd MMM yyyy HH:mm:ss', 'pt_BR').format(t.date),
-              'ticker': t.ticker.isNotEmpty ? t.ticker : asset.ticker,
-              'segment': asset.segment.isNotEmpty ? asset.segment : 'Ativo B3',
-              'typeStr': t.type == TransactionType.buy ? 'Compra' : 'Venda',
-              'quantity': t.quantity > 0 ? t.quantity : 1,
-              'price': t.price > 0 ? t.price : asset.averagePrice,
-              'total': t.amount > 0 ? t.amount : (t.price * t.quantity),
-              'institution': t.institution.isNotEmpty ? t.institution : 'Sua Instituição',
-            });
-          }
-        } else {
-          // Add main position transaction if no sub-transactions logged
+
+      if (trades.isNotEmpty) {
+        for (final t in trades) {
           flatTransactions.add({
-            'date': DateTime.now().subtract(Duration(days: flatTransactions.length * 3 + 1)),
-            'formattedDate': DateFormat('dd MMM yyyy HH:mm:ss', 'pt_BR').format(
-              DateTime.now().subtract(Duration(days: flatTransactions.length * 3 + 1, hours: 4)),
-            ),
-            'ticker': asset.ticker,
-            'segment': asset.segment.isNotEmpty ? asset.segment : 'Ativo B3',
-            'typeStr': 'Compra',
-            'quantity': asset.quantity,
-            'price': asset.averagePrice,
-            'total': asset.averagePrice * asset.quantity,
-            'institution': 'XP Investimentos',
+            'id': t.id,
+            'date': t.date,
+            'formattedDate': DateFormat('dd MMM yyyy HH:mm:ss', 'pt_BR').format(t.date),
+            'ticker': t.ticker,
+            'segment': t.segment.isNotEmpty ? t.segment : (t.name.isNotEmpty ? t.name : 'Ativo B3'),
+            'typeStr': t.type == TransactionType.buy ? 'Compra' : 'Venda',
+            'quantity': t.quantity > 0 ? t.quantity.toInt() : 1,
+            'price': t.price,
+            'total': t.total > 0 ? t.total : (t.price * t.quantity),
+            'institution': t.broker.isNotEmpty ? t.broker : 'XP Investimentos',
           });
         }
-      }
-
-      // Populate sample real historical transactions if brand new
-      if (flatTransactions.isEmpty) {
-        flatTransactions = [
-          {
-            'date': DateTime.now().subtract(const Duration(days: 1)),
-            'formattedDate': '30 Jul 2026 01:53:53',
-            'ticker': 'SANB11',
-            'segment': 'Santander BR Units',
-            'typeStr': 'Venda',
-            'quantity': 5,
-            'price': 25.63,
-            'total': 128.15,
-            'institution': 'Sua Instituição',
-          },
-          {
-            'date': DateTime.now().subtract(const Duration(days: 2)),
-            'formattedDate': '29 Jul 2026 14:22:10',
-            'ticker': 'VALE3',
-            'segment': 'Vale ON',
-            'typeStr': 'Compra',
-            'quantity': 100,
-            'price': 68.40,
-            'total': 6840.00,
-            'institution': 'NuInvest',
-          },
-          {
-            'date': DateTime.now().subtract(const Duration(days: 3)),
-            'formattedDate': '28 Jul 2026 10:15:45',
-            'ticker': 'ITUB4',
-            'segment': 'Itaú Unibanco PN',
-            'typeStr': 'Compra',
-            'quantity': 50,
-            'price': 31.85,
-            'total': 1592.50,
-            'institution': 'XP Investimentos',
-          },
-          {
-            'date': DateTime.now().subtract(const Duration(days: 6)),
-            'formattedDate': '25 Jul 2026 09:30:12',
-            'ticker': 'WEGE3',
-            'segment': 'WEG S.A.',
-            'typeStr': 'Compra',
-            'quantity': 80,
-            'price': 38.50,
-            'total': 3080.00,
-            'institution': 'BTG Pactual',
-          },
-          {
-            'date': DateTime.now().subtract(const Duration(days: 10)),
-            'formattedDate': '20 Jul 2026 16:45:00',
-            'ticker': 'HGLG11',
-            'segment': 'CSHG Logística',
-            'typeStr': 'Compra',
-            'quantity': 20,
-            'price': 160.00,
-            'total': 3200.00,
-            'institution': 'Inter',
-          },
-          {
-            'date': DateTime.now().subtract(const Duration(days: 14)),
-            'formattedDate': '16 Jul 2026 11:20:33',
-            'ticker': 'PETR4',
-            'segment': 'Petrobras PN',
-            'typeStr': 'Venda',
-            'quantity': 80,
-            'price': 39.90,
-            'total': 3192.65,
-            'institution': 'XP Investimentos',
-          },
-        ];
+      } else if (assets.isNotEmpty) {
+        for (final asset in assets) {
+          if (asset.transactions.isNotEmpty) {
+            for (final t in asset.transactions) {
+              flatTransactions.add({
+                'date': t.date,
+                'formattedDate': DateFormat('dd MMM yyyy HH:mm:ss', 'pt_BR').format(t.date),
+                'ticker': t.ticker.isNotEmpty ? t.ticker : asset.ticker,
+                'segment': asset.segment.isNotEmpty ? asset.segment : 'Ativo B3',
+                'typeStr': t.type == TransactionType.buy ? 'Compra' : 'Venda',
+                'quantity': t.quantity > 0 ? t.quantity : 1,
+                'price': t.price > 0 ? t.price : asset.averagePrice,
+                'total': t.amount > 0 ? t.amount : (t.price * t.quantity),
+                'institution': t.institution.isNotEmpty ? t.institution : 'Sua Instituição',
+              });
+            }
+          } else {
+            flatTransactions.add({
+              'date': DateTime.now().subtract(Duration(days: flatTransactions.length * 3 + 1)),
+              'formattedDate': DateFormat('dd MMM yyyy HH:mm:ss', 'pt_BR').format(
+                DateTime.now().subtract(Duration(days: flatTransactions.length * 3 + 1, hours: 4)),
+              ),
+              'ticker': asset.ticker,
+              'segment': asset.segment.isNotEmpty ? asset.segment : 'Ativo B3',
+              'typeStr': 'Compra',
+              'quantity': asset.quantity,
+              'price': asset.averagePrice,
+              'total': asset.averagePrice * asset.quantity,
+              'institution': 'XP Investimentos',
+            });
+          }
+        }
       }
 
       // Sort by newest date first
       flatTransactions.sort((a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
 
-      setState(() {
-        _assets = loadedAssets;
-        _allTransactions = flatTransactions;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _allTransactions = flatTransactions;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       debugPrint('Error loading extract transactions: $e');
       if (mounted) setState(() => _isLoading = false);
@@ -280,6 +196,12 @@ class _ExtratoPageState extends State<ExtratoPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Reactively observe provider transactions
+    final providerTrades = context.watch<AssetProvider>().transactions;
+    if (providerTrades.length != _allTransactions.length) {
+      _loadData();
+    }
+
     final filtered = _filteredTransactions;
     final totalPages = (filtered.length / _recordsPerPage).ceil().clamp(1, 9999);
     final validPage = _currentPage.clamp(1, totalPages);
@@ -317,7 +239,7 @@ class _ExtratoPageState extends State<ExtratoPage> {
                         ),
                         const SizedBox(height: 20),
 
-                        // 2. Summary Metric Cards (Total Negociado, Volume Compras, Volume Vendas)
+                        // 2. Summary Metric Cards
                         ExtractSummaryCards(
                           totalTraded: _totalTraded,
                           totalPurchases: _totalPurchases,
@@ -325,7 +247,7 @@ class _ExtratoPageState extends State<ExtratoPage> {
                         ),
                         const SizedBox(height: 20),
 
-                        // 3. Combined Filter Toolbar (Periods, Search Box, Type Dropdown)
+                        // 3. Combined Filter Toolbar
                         ExtractFiltersBar(
                           selectedPeriod: _selectedPeriod,
                           searchQuery: _searchQuery,

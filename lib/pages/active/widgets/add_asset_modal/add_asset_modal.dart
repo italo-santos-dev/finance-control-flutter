@@ -1,28 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_investment_control/core/app_colors.dart';
 import 'package:flutter_investment_control/models/asset_model.dart';
+import 'package:flutter_investment_control/models/trade_transaction.dart';
 import 'package:flutter_investment_control/models/transaction_model.dart';
 import 'package:flutter_investment_control/pages/active/widgets/add_asset_modal/add_asset_operation_form.dart';
 import 'package:flutter_investment_control/pages/active/widgets/add_asset_modal/add_asset_search_field.dart';
 import 'package:flutter_investment_control/pages/active/widgets/add_asset_modal/add_asset_selected_card.dart';
 import 'package:flutter_investment_control/pages/active/widgets/add_asset_modal/add_asset_summary_preview.dart';
 import 'package:flutter_investment_control/services/apis/api_service.dart';
+import 'package:flutter_investment_control/services/asset_provider.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 class AddAssetModal extends StatefulWidget {
   final List<Asset> existingAssets;
-  final Function(Asset) onAssetAdded;
+  final Function(Asset)? onAssetAdded;
 
   const AddAssetModal({
     super.key,
     required this.existingAssets,
-    required this.onAssetAdded,
+    this.onAssetAdded,
   });
 
   static Future<void> show(
     BuildContext context, {
     required List<Asset> existingAssets,
-    required Function(Asset) onAssetAdded,
+    Function(Asset)? onAssetAdded,
   }) {
     return showDialog(
       context: context,
@@ -113,7 +116,7 @@ class _AddAssetModalState extends State<AddAssetModal> {
     }
   }
 
-  void _saveAsset() {
+  Future<void> _saveAsset() async {
     if (_selectedAsset == null) return;
 
     double qty = double.tryParse(_quantityController.text.replaceAll(',', '.').trim()) ?? 0.0;
@@ -127,35 +130,45 @@ class _AddAssetModalState extends State<AddAssetModal> {
     String ticker = (_selectedAsset!['ticker'] ?? _selectedAsset!['symbol'] ?? '').toString().toUpperCase();
     String name = (_selectedAsset!['name'] ?? _selectedAsset!['segment'] ?? ticker).toString();
     String type = (_selectedAsset!['activeType'] ?? 'Ação').toString();
+    String segment = (_selectedAsset!['segment'] ?? name).toString();
 
-    double effectiveCurrentPrice = _currentPrice > 0 ? _currentPrice : buyPrice;
-
-    final newTransaction = Transaction(
-      date: _purchaseDate,
+    // 1. Create SQLite TradeTransaction (Single Source of Truth)
+    final newTrade = TradeTransaction(
+      id: 'trade-${DateTime.now().millisecondsSinceEpoch}',
       ticker: ticker,
+      name: name,
       type: TransactionType.buy,
-      market: 'B3',
-      maturityDate: _purchaseDate.add(const Duration(days: 365)),
-      institution: _selectedBroker,
-      tradingCode: ticker,
-      quantity: qty.toInt(),
+      quantity: qty,
       price: buyPrice,
-      amount: (qty * buyPrice) + fees,
-    );
-
-    final newAsset = Asset(
-      ticker: ticker,
+      fees: fees,
+      total: (qty * buyPrice) + fees,
+      date: _purchaseDate,
+      broker: _selectedBroker,
       activeType: type,
-      segment: name,
-      averagePrice: buyPrice,
-      currentPrice: effectiveCurrentPrice,
-      quantity: qty.toInt(),
-      transactions: [newTransaction],
-      isFullyLiquidated: false,
+      segment: segment,
+      createdAt: DateTime.now(),
     );
 
-    widget.onAssetAdded(newAsset);
-    Navigator.pop(context);
+    // 2. Persist to SQLite Database & update Provider state
+    await context.read<AssetProvider>().addTradeTransaction(newTrade);
+
+    if (widget.onAssetAdded != null) {
+      final legacyAsset = Asset(
+        ticker: ticker,
+        activeType: type,
+        segment: segment,
+        averagePrice: buyPrice,
+        currentPrice: _currentPrice > 0 ? _currentPrice : buyPrice,
+        quantity: qty.toInt(),
+        transactions: [newTrade.toLegacyTransaction()],
+        isFullyLiquidated: false,
+      );
+      widget.onAssetAdded!(legacyAsset);
+    }
+
+    if (mounted) {
+      Navigator.pop(context);
+    }
   }
 
   bool get _isValid {
@@ -167,7 +180,6 @@ class _AddAssetModalState extends State<AddAssetModal> {
 
   @override
   Widget build(BuildContext context) {
-    // Collect known assets for autocomplete
     List<Map<String, dynamic>> known = [
       {'ticker': 'PETR4', 'name': 'Petróleo Brasileiro S.A. Petrobras', 'activeType': 'Ação', 'segment': 'Petróleo e Gás'},
       {'ticker': 'VALE3', 'name': 'Vale S.A.', 'activeType': 'Ação', 'segment': 'Mineração'},
@@ -200,7 +212,6 @@ class _AddAssetModalState extends State<AddAssetModal> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -223,7 +234,6 @@ class _AddAssetModalState extends State<AddAssetModal> {
               ),
               const SizedBox(height: 16),
 
-              // Step 1: Search or Selected Card
               if (_selectedAsset == null)
                 AddAssetSearchField(
                   knownAssets: known,
@@ -242,7 +252,6 @@ class _AddAssetModalState extends State<AddAssetModal> {
                 ),
                 const SizedBox(height: 16),
 
-                // Step 2: Trade Details Form
                 AddAssetOperationForm(
                   quantityController: _quantityController,
                   purchasePriceController: _purchasePriceController,
@@ -255,7 +264,6 @@ class _AddAssetModalState extends State<AddAssetModal> {
                 ),
                 const SizedBox(height: 16),
 
-                // Step 3: Live Summary Preview
                 AddAssetSummaryPreview(
                   ticker: (_selectedAsset!['ticker'] ?? _selectedAsset!['symbol'] ?? '').toString().toUpperCase(),
                   assetName: (_selectedAsset!['name'] ?? _selectedAsset!['segment'] ?? '').toString(),
@@ -269,7 +277,6 @@ class _AddAssetModalState extends State<AddAssetModal> {
               ],
               const SizedBox(height: 20),
 
-              // Action Buttons
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [

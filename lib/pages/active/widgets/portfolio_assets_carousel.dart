@@ -1,9 +1,10 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_investment_control/core/app_colors.dart';
 import 'package:flutter_investment_control/models/asset_model.dart';
 import 'package:intl/intl.dart';
 
-class PortfolioAssetsCarousel extends StatelessWidget {
+class PortfolioAssetsCarousel extends StatefulWidget {
   final List<Asset> assets;
   final double totalPortfolioValue;
   final bool hideValues;
@@ -20,12 +21,56 @@ class PortfolioAssetsCarousel extends StatelessWidget {
   });
 
   @override
+  State<PortfolioAssetsCarousel> createState() => _PortfolioAssetsCarouselState();
+}
+
+class _PortfolioAssetsCarouselState extends State<PortfolioAssetsCarousel> {
+  final ScrollController _scrollController = ScrollController();
+  bool _canScrollLeft = false;
+  bool _canScrollRight = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_updateScrollIndicators);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_updateScrollIndicators);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _updateScrollIndicators() {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.offset;
+
+    setState(() {
+      _canScrollLeft = currentScroll > 10;
+      _canScrollRight = currentScroll < (maxScroll - 10);
+    });
+  }
+
+  void _scroll(double offset) {
+    if (!_scrollController.hasClients) return;
+    _scrollController.animateTo(
+      (_scrollController.offset + offset).clamp(0.0, _scrollController.position.maxScrollExtent),
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final NumberFormat realFormat = NumberFormat.currency(locale: 'pt-BR', symbol: 'R\$');
+    bool showNavArrows = widget.assets.length > 2;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Section Header with Title, Count Badge, and Nav Buttons
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -49,7 +94,7 @@ class PortfolioAssetsCarousel extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    '${assets.length}',
+                    '${widget.assets.length}',
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
@@ -59,18 +104,38 @@ class PortfolioAssetsCarousel extends StatelessWidget {
                 ),
               ],
             ),
-            TextButton.icon(
-              onPressed: onViewAll,
-              icon: const Icon(Icons.arrow_forward, size: 14, color: AppColors.blueAccent),
-              label: const Text(
-                'Ver todos',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.blueAccent),
-              ),
+            Row(
+              children: [
+                if (showNavArrows) ...[
+                  _buildNavArrow(
+                    icon: Icons.chevron_left,
+                    isEnabled: _canScrollLeft,
+                    onTap: () => _scroll(-260),
+                  ),
+                  const SizedBox(width: 6),
+                  _buildNavArrow(
+                    icon: Icons.chevron_right,
+                    isEnabled: _canScrollRight,
+                    onTap: () => _scroll(260),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                TextButton.icon(
+                  onPressed: widget.onViewAll,
+                  icon: const Icon(Icons.arrow_forward, size: 14, color: AppColors.blueAccent),
+                  label: const Text(
+                    'Ver todos',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.blueAccent),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
         const SizedBox(height: 12),
-        if (assets.isEmpty)
+
+        // Carousel or Empty State
+        if (widget.assets.isEmpty)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(24),
@@ -99,164 +164,198 @@ class PortfolioAssetsCarousel extends StatelessWidget {
         else
           SizedBox(
             height: 140,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              itemCount: assets.length,
-              itemBuilder: (context, index) {
-                final asset = assets[index];
-                double positionValue = asset.totalAmount;
-                double allocPct = totalPortfolioValue > 0 ? (positionValue / totalPortfolioValue) : 0.0;
-                double yieldPct = asset.profitability;
-                bool isPositiveYield = yieldPct >= 0;
+            child: ScrollConfiguration(
+              behavior: const MaterialScrollBehavior().copyWith(
+                dragDevices: {
+                  PointerDeviceKind.mouse,
+                  PointerDeviceKind.touch,
+                  PointerDeviceKind.stylus,
+                  PointerDeviceKind.trackpad,
+                },
+              ),
+              child: ListView.builder(
+                controller: _scrollController,
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: widget.assets.length,
+                itemBuilder: (context, index) {
+                  final asset = widget.assets[index];
+                  double positionValue = asset.totalAmount;
+                  double allocPct = widget.totalPortfolioValue > 0 ? (positionValue / widget.totalPortfolioValue) : 0.0;
+                  double yieldPct = asset.profitability;
+                  bool isPositiveYield = yieldPct >= 0;
 
-                String typeTag = asset.activeType.toUpperCase();
-                if (typeTag.contains('FII')) typeTag = 'FII';
-                else if (typeTag.contains('AÇÃO') || typeTag.contains('ACAO')) typeTag = 'AÇÃO';
-                else if (typeTag.contains('CRIPTO')) typeTag = 'CRIPTO';
+                  String typeTag = asset.activeType.toUpperCase();
+                  if (typeTag.contains('FII')) {
+                    typeTag = 'FII';
+                  } else if (typeTag.contains('AÇÃO') || typeTag.contains('ACAO')) {
+                    typeTag = 'AÇÃO';
+                  } else if (typeTag.contains('CRIPTO')) {
+                    typeTag = 'CRIPTO';
+                  }
 
-                Color tagColor = AppColors.primaryBlue;
-                if (typeTag == 'FII') tagColor = AppColors.emeraldGreen;
-                if (typeTag == 'CRIPTO') tagColor = Colors.amber;
+                  Color tagColor = AppColors.primaryBlue;
+                  if (typeTag == 'FII') tagColor = AppColors.emeraldGreen;
+                  if (typeTag == 'CRIPTO') tagColor = Colors.amber;
 
-                return GestureDetector(
-                  onTap: () => onSelectAsset(asset),
-                  child: Container(
-                    width: 240,
-                    margin: const EdgeInsets.only(right: 12),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: AppColors.cardDark,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.borderDark),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Header Row
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                _buildAvatar(asset.ticker),
-                                const SizedBox(width: 8),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      asset.ticker,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.white,
+                  return GestureDetector(
+                    onTap: () => widget.onSelectAsset(asset),
+                    child: Container(
+                      width: 250,
+                      margin: const EdgeInsets.only(right: 12),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.cardDark,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.borderDark),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Header Row (Avatar, Ticker, Segment, Type Badge)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  _buildAvatar(asset.ticker),
+                                  const SizedBox(width: 8),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        asset.ticker,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.white,
+                                        ),
                                       ),
-                                    ),
-                                    Text(
-                                      asset.segment.isNotEmpty ? asset.segment : 'Ativo B3',
-                                      style: const TextStyle(fontSize: 9, color: Colors.grey),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: tagColor.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(4),
+                                      SizedBox(
+                                        width: 110,
+                                        child: Text(
+                                          asset.segment.isNotEmpty ? asset.segment : 'Ativo B3',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontSize: 9, color: Colors.grey),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
-                              child: Text(
-                                typeTag,
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.bold,
-                                  color: tagColor,
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: tagColor.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(4),
                                 ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-
-                        // Values Row
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Quantidade', style: TextStyle(fontSize: 9, color: Colors.grey)),
-                                const SizedBox(height: 2),
-                                Text(
-                                  hideValues ? '•••' : '${asset.quantity}',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                                ),
-                              ],
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                const Text('Posição Atual', style: TextStyle(fontSize: 9, color: Colors.grey)),
-                                const SizedBox(height: 2),
-                                Text(
-                                  hideValues ? 'R\$ •••••' : realFormat.format(positionValue),
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Progress Allocation Bar & Yield Badge
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(2),
-                                child: LinearProgressIndicator(
-                                  value: allocPct.clamp(0.01, 1.0),
-                                  backgroundColor: AppColors.inputDark,
-                                  color: tagColor,
-                                  minHeight: 4,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '${(allocPct * 100).toStringAsFixed(0)}%',
-                              style: const TextStyle(fontSize: 10, color: Colors.grey),
-                            ),
-                            const SizedBox(width: 8),
-                            Row(
-                              children: [
-                                Icon(
-                                  isPositiveYield ? Icons.arrow_upward : Icons.arrow_downward,
-                                  size: 10,
-                                  color: isPositiveYield ? AppColors.emeraldGreen : AppColors.redLoss,
-                                ),
-                                Text(
-                                  '${isPositiveYield ? '+' : ''}${yieldPct.toStringAsFixed(1)}%',
+                                child: Text(
+                                  typeTag,
                                   style: TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 9,
                                     fontWeight: FontWeight.bold,
-                                    color: isPositiveYield ? AppColors.emeraldGreen : AppColors.redLoss,
+                                    color: tagColor,
                                   ),
                                 ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ],
+                              ),
+                            ],
+                          ),
+
+                          // Values Row (Quantidade, Posição Atual)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Quantidade', style: TextStyle(fontSize: 9, color: Colors.grey)),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    widget.hideValues ? '•••' : '${asset.quantity}',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                                  ),
+                                ],
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  const Text('Posição Atual', style: TextStyle(fontSize: 9, color: Colors.grey)),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    widget.hideValues ? 'R\$ •••••' : realFormat.format(positionValue),
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+
+                          // Progress Allocation Bar & Yield Badge
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(2),
+                                  child: LinearProgressIndicator(
+                                    value: allocPct.clamp(0.01, 1.0),
+                                    backgroundColor: AppColors.inputDark,
+                                    color: tagColor,
+                                    minHeight: 4,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${(allocPct * 100).toStringAsFixed(0)}%',
+                                style: const TextStyle(fontSize: 10, color: Colors.grey),
+                              ),
+                              const SizedBox(width: 8),
+                              Row(
+                                children: [
+                                  Icon(
+                                    isPositiveYield ? Icons.arrow_upward : Icons.arrow_downward,
+                                    size: 10,
+                                    color: isPositiveYield ? AppColors.emeraldGreen : AppColors.redLoss,
+                                  ),
+                                  Text(
+                                    '${isPositiveYield ? '+' : ''}${yieldPct.toStringAsFixed(1)}%',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: isPositiveYield ? AppColors.emeraldGreen : AppColors.redLoss,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
           ),
       ],
+    );
+  }
+
+  Widget _buildNavArrow({required IconData icon, required bool isEnabled, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: isEnabled ? onTap : null,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: isEnabled ? AppColors.inputDark : AppColors.inputDark.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: isEnabled ? AppColors.borderDark : AppColors.borderDark.withValues(alpha: 0.3)),
+        ),
+        child: Icon(icon, size: 16, color: isEnabled ? Colors.white : Colors.white24),
+      ),
     );
   }
 

@@ -107,7 +107,20 @@ class _AssetListState extends State<AssetList> {
             averagePrice: 28.50,
             currentPrice: 34.90,
             quantity: 1500,
-            transactions: [],
+            transactions: [
+              Transaction(
+                date: DateTime.now().subtract(const Duration(days: 28, hours: 2)),
+                ticker: 'ITUB4',
+                type: TransactionType.buy,
+                market: 'B3',
+                maturityDate: DateTime.now().add(const Duration(days: 365)),
+                institution: 'XP Investimentos',
+                tradingCode: 'ITUB4',
+                quantity: 1500,
+                price: 28.50,
+                amount: 28.50 * 1500,
+              ),
+            ],
             isFullyLiquidated: false,
           ),
           Asset(
@@ -117,7 +130,20 @@ class _AssetListState extends State<AssetList> {
             averagePrice: 160.00,
             currentPrice: 190.17,
             quantity: 350,
-            transactions: [],
+            transactions: [
+              Transaction(
+                date: DateTime.now().subtract(const Duration(days: 20, hours: 4)),
+                ticker: 'HGLG11',
+                type: TransactionType.buy,
+                market: 'B3',
+                maturityDate: DateTime.now().add(const Duration(days: 365)),
+                institution: 'Inter',
+                tradingCode: 'HGLG11',
+                quantity: 350,
+                price: 160.00,
+                amount: 160.00 * 350,
+              ),
+            ],
             isFullyLiquidated: false,
           ),
           Asset(
@@ -127,7 +153,20 @@ class _AssetListState extends State<AssetList> {
             averagePrice: 32.00,
             currentPrice: 39.00,
             quantity: 800,
-            transactions: [],
+            transactions: [
+              Transaction(
+                date: DateTime.now().subtract(const Duration(days: 14, hours: 1)),
+                ticker: 'WEGE3',
+                type: TransactionType.buy,
+                market: 'B3',
+                maturityDate: DateTime.now().add(const Duration(days: 365)),
+                institution: 'BTG Pactual',
+                tradingCode: 'WEGE3',
+                quantity: 800,
+                price: 32.00,
+                amount: 32.00 * 800,
+              ),
+            ],
             isFullyLiquidated: false,
           ),
           Asset(
@@ -137,7 +176,20 @@ class _AssetListState extends State<AssetList> {
             averagePrice: 62.00,
             currentPrice: 68.50,
             quantity: 500,
-            transactions: [],
+            transactions: [
+              Transaction(
+                date: DateTime.now().subtract(const Duration(days: 8, hours: 3)),
+                ticker: 'VALE3',
+                type: TransactionType.buy,
+                market: 'B3',
+                maturityDate: DateTime.now().add(const Duration(days: 365)),
+                institution: 'NuInvest',
+                tradingCode: 'VALE3',
+                quantity: 500,
+                price: 62.00,
+                amount: 62.00 * 500,
+              ),
+            ],
             isFullyLiquidated: false,
           ),
         ]);
@@ -167,7 +219,7 @@ class _AssetListState extends State<AssetList> {
             .map((transaction) => {
                   'date': transaction.date.toIso8601String(),
                   'ticker': transaction.ticker,
-                  'type': transaction.type.toString(),
+                  'type': transaction.type == TransactionType.buy ? 'buy' : 'sell',
                   'market': transaction.market,
                   'maturityDate': transaction.maturityDate.toIso8601String(),
                   'institution': transaction.institution,
@@ -199,6 +251,7 @@ class _AssetListState extends State<AssetList> {
       if (newAsset.currentPrice > 0) {
         existingAsset.currentPrice = newAsset.currentPrice;
       }
+      existingAsset.transactions.addAll(newAsset.transactions);
     } else {
       assets.add(newAsset);
     }
@@ -217,12 +270,16 @@ class _AssetListState extends State<AssetList> {
   }
 
   double get _totalPortfolioEquity {
-    return assets.fold(0.0, (sum, item) => sum + item.totalAmount);
+    final provider = context.read<AssetProvider>();
+    final currentAssets = provider.assets.isNotEmpty ? provider.assets : assets;
+    return currentAssets.fold(0.0, (sum, item) => sum + item.totalAmount);
   }
 
   double get _monthlyYieldPct {
-    if (assets.isEmpty) return 2.45;
-    double totalCost = assets.fold(0.0, (sum, item) => sum + (item.averagePrice * item.quantity));
+    final provider = context.read<AssetProvider>();
+    final currentAssets = provider.assets.isNotEmpty ? provider.assets : assets;
+    if (currentAssets.isEmpty) return 2.45;
+    double totalCost = currentAssets.fold(0.0, (sum, item) => sum + (item.averagePrice * item.quantity));
     if (totalCost == 0) return 0.0;
     return ((_totalPortfolioEquity - totalCost) / totalCost) * 100;
   }
@@ -230,6 +287,8 @@ class _AssetListState extends State<AssetList> {
   @override
   Widget build(BuildContext context) {
     bool isWide = MediaQuery.of(context).size.width > 900;
+    final provider = context.watch<AssetProvider>();
+    final currentAssets = provider.assets.isNotEmpty ? provider.assets : assets;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
@@ -265,13 +324,13 @@ class _AssetListState extends State<AssetList> {
 
                         // 3. Asset Cards Carousel / Grid
                         PortfolioAssetsCarousel(
-                          assets: assets,
+                          assets: currentAssets,
                           totalPortfolioValue: _totalPortfolioEquity,
                           hideValues: _hideValues,
                           onSelectAsset: (asset) => _showAssetActionModal(context, asset),
                           onViewAll: () {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('${assets.length} ativos em carteira')),
+                              SnackBar(content: Text('${currentAssets.length} ativos em carteira')),
                             );
                           },
                         ),
@@ -293,7 +352,7 @@ class _AssetListState extends State<AssetList> {
                                     ),
                                     const SizedBox(height: 16),
                                     PortfolioTopPerformance(
-                                      assets: assets,
+                                      assets: currentAssets,
                                       onViewAll: () {},
                                     ),
                                     const SizedBox(height: 16),
@@ -308,12 +367,13 @@ class _AssetListState extends State<AssetList> {
 
                               // Right Column (Allocation Donut Chart, Upcoming Dividend Calendar)
                               Expanded(
-                                flex: 4,
+                                flex: 5,
                                 child: Column(
                                   children: [
                                     PortfolioAllocationChart(
-                                      assets: assets,
+                                      assets: currentAssets,
                                       totalPortfolioValue: _totalPortfolioEquity,
+                                      hideValues: _hideValues,
                                     ),
                                     const SizedBox(height: 16),
                                     const PortfolioUpcomingDividends(),
@@ -332,12 +392,13 @@ class _AssetListState extends State<AssetList> {
                               ),
                               const SizedBox(height: 16),
                               PortfolioAllocationChart(
-                                assets: assets,
+                                assets: currentAssets,
                                 totalPortfolioValue: _totalPortfolioEquity,
+                                hideValues: _hideValues,
                               ),
                               const SizedBox(height: 16),
                               PortfolioTopPerformance(
-                                assets: assets,
+                                assets: currentAssets,
                                 onViewAll: () {},
                               ),
                               const SizedBox(height: 16),
