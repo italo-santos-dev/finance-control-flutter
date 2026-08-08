@@ -15,6 +15,8 @@ import 'package:flutter_investment_control/services/apis/global_stocks_service.d
 import 'package:flutter_investment_control/widgets/adverts/adverts_widget.dart';
 import 'package:flutter_investment_control/pages/home/widgets/home_chart_page.dart';
 import 'package:flutter_investment_control/pages/active/active_page.dart';
+import 'package:flutter_investment_control/pages/active/extract/extract_page.dart';
+import 'package:flutter_investment_control/pages/active/widgets/add_asset_modal/add_asset_modal.dart';
 import 'package:flutter_investment_control/widgets/buttons/modern_cta_button.dart';
 import 'package:flutter_investment_control/pages/home/widgets/home_sparkline_painter.dart';
 import 'package:flutter_investment_control/pages/home/widgets/home_stock_ticker_widget.dart';
@@ -612,6 +614,43 @@ class _HomePageState extends State<HomePage> {
             )
           else
             const Spacer(),
+          const SizedBox(width: 8),
+          // Top Navigation Links
+          TextButton.icon(
+            onPressed: () {},
+            icon: const Icon(Icons.dashboard_outlined, size: 14, color: AppColors.primaryBlue),
+            label: const Text('Mercados', style: TextStyle(color: AppColors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(width: 2),
+          TextButton.icon(
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => ActivePage()));
+            },
+            icon: const Icon(Icons.pie_chart_outline, size: 14, color: AppColors.emeraldGreen),
+            label: const Text('Carteira', style: TextStyle(color: Colors.grey, fontSize: 11)),
+          ),
+          const SizedBox(width: 2),
+          TextButton.icon(
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const ExtratoPage()));
+            },
+            icon: const Icon(Icons.receipt_long_outlined, size: 14, color: AppColors.blueAccent),
+            label: const Text('Extrato', style: TextStyle(color: Colors.grey, fontSize: 11)),
+          ),
+          const SizedBox(width: 6),
+          ElevatedButton.icon(
+            onPressed: () {
+              AddAssetModal.show(context, existingAssets: []);
+            },
+            icon: const Icon(Icons.add, size: 14),
+            label: const Text('Novo Ativo', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryBlue,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            ),
+          ),
           const SizedBox(width: 8),
           // Notification Bell
           Stack(
