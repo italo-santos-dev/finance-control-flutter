@@ -8,7 +8,7 @@ import 'package:provider/provider.dart';
 
 class AssetProvider extends ChangeNotifier {
   final TransactionRepository _transactionRepo = TransactionRepository();
-  final PortfolioRepository _portfolioRepo = PortfolioRepository();
+  late final PortfolioRepository _portfolioRepo;
 
   List<Asset> _assets = [];
   List<TradeTransaction> _transactions = [];
@@ -20,7 +20,87 @@ class AssetProvider extends ChangeNotifier {
   Asset? selectedAsset;
 
   AssetProvider() {
+    _portfolioRepo = PortfolioRepository(transactionRepository: _transactionRepo);
+    _initDefaultStateSynchronously();
     loadPortfolio();
+  }
+
+  void _initDefaultStateSynchronously() {
+    // Provide instant synchronous fallback so UI is NEVER empty on first frame
+    final defaultTrades = [
+      TradeTransaction(
+        id: 'initial-itub4',
+        ticker: 'ITUB4',
+        name: 'Itaú Unibanco Holding S.A.',
+        type: TransactionType.buy,
+        quantity: 1500,
+        price: 28.50,
+        total: 42750.00,
+        date: DateTime.now().subtract(const Duration(days: 28, hours: 2)),
+        broker: 'XP Investimentos',
+        activeType: 'Ação',
+        segment: 'Itaú Unibanco',
+        createdAt: DateTime.now().subtract(const Duration(days: 28)),
+      ),
+      TradeTransaction(
+        id: 'initial-hglg11',
+        ticker: 'HGLG11',
+        name: 'CSHG Logística FII',
+        type: TransactionType.buy,
+        quantity: 350,
+        price: 160.00,
+        total: 56000.00,
+        date: DateTime.now().subtract(const Duration(days: 20, hours: 4)),
+        broker: 'Banco Inter',
+        activeType: 'FII',
+        segment: 'CSHG Logística',
+        createdAt: DateTime.now().subtract(const Duration(days: 20)),
+      ),
+      TradeTransaction(
+        id: 'initial-wege3',
+        ticker: 'WEGE3',
+        name: 'WEG S.A.',
+        type: TransactionType.buy,
+        quantity: 800,
+        price: 32.00,
+        total: 25600.00,
+        date: DateTime.now().subtract(const Duration(days: 14, hours: 1)),
+        broker: 'BTG Pactual',
+        activeType: 'Ação',
+        segment: 'WEG S.A.',
+        createdAt: DateTime.now().subtract(const Duration(days: 14)),
+      ),
+      TradeTransaction(
+        id: 'initial-vale3',
+        ticker: 'VALE3',
+        name: 'Vale S.A.',
+        type: TransactionType.buy,
+        quantity: 500,
+        price: 62.00,
+        total: 31000.00,
+        date: DateTime.now().subtract(const Duration(days: 8, hours: 3)),
+        broker: 'NuInvest',
+        activeType: 'Ação',
+        segment: 'Vale S.A.',
+        createdAt: DateTime.now().subtract(const Duration(days: 8)),
+      ),
+      TradeTransaction(
+        id: 'initial-sanb11',
+        ticker: 'SANB11',
+        name: 'Banco Santander Brasil S.A.',
+        type: TransactionType.buy,
+        quantity: 1000,
+        price: 29.27,
+        total: 29270.00,
+        date: DateTime.now().subtract(const Duration(days: 4, hours: 5)),
+        broker: 'XP Investimentos',
+        activeType: 'Ação',
+        segment: 'Santander BR',
+        createdAt: DateTime.now().subtract(const Duration(days: 4)),
+      ),
+    ];
+
+    _transactions = List.from(defaultTrades);
   }
 
   Future<void> loadPortfolio() async {
@@ -28,84 +108,14 @@ class AssetProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Seed default transactions if local SQLite database is brand new
-      await _transactionRepo.seedInitialTransactionsIfEmpty([
-        TradeTransaction(
-          id: 'initial-itub4',
-          ticker: 'ITUB4',
-          name: 'Itaú Unibanco Holding S.A.',
-          type: TransactionType.buy,
-          quantity: 1500,
-          price: 28.50,
-          total: 42750.00,
-          date: DateTime.now().subtract(const Duration(days: 28, hours: 2)),
-          broker: 'XP Investimentos',
-          activeType: 'Ação',
-          segment: 'Itaú Unibanco',
-          createdAt: DateTime.now().subtract(const Duration(days: 28)),
-        ),
-        TradeTransaction(
-          id: 'initial-hglg11',
-          ticker: 'HGLG11',
-          name: 'CSHG Logística FII',
-          type: TransactionType.buy,
-          quantity: 350,
-          price: 160.00,
-          total: 56000.00,
-          date: DateTime.now().subtract(const Duration(days: 20, hours: 4)),
-          broker: 'Banco Inter',
-          activeType: 'FII',
-          segment: 'CSHG Logística',
-          createdAt: DateTime.now().subtract(const Duration(days: 20)),
-        ),
-        TradeTransaction(
-          id: 'initial-wege3',
-          ticker: 'WEGE3',
-          name: 'WEG S.A.',
-          type: TransactionType.buy,
-          quantity: 800,
-          price: 32.00,
-          total: 25600.00,
-          date: DateTime.now().subtract(const Duration(days: 14, hours: 1)),
-          broker: 'BTG Pactual',
-          activeType: 'Ação',
-          segment: 'WEG S.A.',
-          createdAt: DateTime.now().subtract(const Duration(days: 14)),
-        ),
-        TradeTransaction(
-          id: 'initial-vale3',
-          ticker: 'VALE3',
-          name: 'Vale S.A.',
-          type: TransactionType.buy,
-          quantity: 500,
-          price: 62.00,
-          total: 31000.00,
-          date: DateTime.now().subtract(const Duration(days: 8, hours: 3)),
-          broker: 'NuInvest',
-          activeType: 'Ação',
-          segment: 'Vale S.A.',
-          createdAt: DateTime.now().subtract(const Duration(days: 8)),
-        ),
-        TradeTransaction(
-          id: 'initial-sanb11',
-          ticker: 'SANB11',
-          name: 'Banco Santander Brasil S.A.',
-          type: TransactionType.buy,
-          quantity: 1000,
-          price: 29.27,
-          total: 29270.00,
-          date: DateTime.now().subtract(const Duration(days: 4, hours: 5)),
-          broker: 'XP Investimentos',
-          activeType: 'Ação',
-          segment: 'Santander BR',
-          createdAt: DateTime.now().subtract(const Duration(days: 4)),
-        ),
-      ]);
-
-      _transactions = await _transactionRepo.getAllTransactions();
+      await _transactionRepo.seedInitialTransactionsIfEmpty(_transactions);
+      final storedTrades = await _transactionRepo.getAllTransactions();
+      if (storedTrades.isNotEmpty) {
+        _transactions = storedTrades;
+      }
       _assets = await _portfolioRepo.getPortfolioPositions();
     } catch (e) {
-      debugPrint('Error loading SQLite portfolio: $e');
+      debugPrint('Error loading persistent portfolio: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -114,12 +124,19 @@ class AssetProvider extends ChangeNotifier {
 
   Future<void> addTradeTransaction(TradeTransaction trade) async {
     try {
+      // 1. Immediately append to in-memory state for 0ms reactivity
+      _transactions.removeWhere((t) => t.id == trade.id);
+      _transactions.insert(0, trade);
+
+      // 2. Persist to storage layer (SQLite / Web storage)
       await _transactionRepo.createTransaction(trade);
-      _transactions = await _transactionRepo.getAllTransactions();
+
+      // 3. Recompute positions and notify all listening pages (Carteira, Extrato, Charts)
       _assets = await _portfolioRepo.getPortfolioPositions();
       notifyListeners();
     } catch (e) {
-      debugPrint('Error adding trade transaction to SQLite: $e');
+      debugPrint('Error adding trade transaction: $e');
+      notifyListeners();
     }
   }
 
@@ -131,7 +148,6 @@ class AssetProvider extends ChangeNotifier {
   Future<void> removeAsset(Asset asset) async {
     try {
       _assets.removeWhere((a) => a.ticker == asset.ticker);
-      // Remove all transactions associated with this asset ticker
       final trades = await _transactionRepo.getTransactionsByTicker(asset.ticker);
       for (var t in trades) {
         await _transactionRepo.deleteTransaction(t.id);
@@ -140,7 +156,7 @@ class AssetProvider extends ChangeNotifier {
       _assets = await _portfolioRepo.getPortfolioPositions();
       notifyListeners();
     } catch (e) {
-      debugPrint('Error removing asset from SQLite: $e');
+      debugPrint('Error removing asset: $e');
     }
   }
 
