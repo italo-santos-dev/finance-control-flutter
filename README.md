@@ -39,43 +39,42 @@ No cenário atual, investidores gerenciam ativos fragmentados entre diversas cor
 
 ## 📸 Screenshots da Aplicação
 
-### 01 — Splash Screen
-Tela de abertura com inicialização de banco de dados, injeção de dependências e carregamento do portfólio.
+### 01 — Home Page
+Visão geral dos mercados, índices mundiais, cotação do Bitcoin, mercado brasileiro e últimas notícias econômicas integradas.
 
 <p align="center">
-  <img src="docs/screenshots/01-splash.png" alt="Splash Screen" width="900" />
+  <img src="docs/screenshots/02-home-01.png" alt="Home Page - Visão Geral dos Mercados" width="900" />
+  <br /><br />
+  <img src="docs/screenshots/02-home-02.png" alt="Home Page - Mercado Brasileiro e Notícias" width="900" />
 </p>
 
 ---
 
-### 02 — Home (Página Completa)
-Visão geral dos mercados, índices mundiais (IBOVESPA, S&P 500, NASDAQ), cotação do Bitcoin e últimas notícias econômicas integradas.
+### 02 — Detalhes do Ativo
+Painel completo de análise com gráfico histórico de cotações, indicadores de Dividend Yield, métricas fundamentalistas, comparativo e notícias.
 
 <p align="center">
-  <img src="docs/screenshots/02-home-full.png" alt="Home Page" width="900" />
+  <img src="docs/screenshots/03-asset-details-01.png" alt="Detalhes do Ativo - Cotação e Posição" width="900" />
+  <br /><br />
+  <img src="docs/screenshots/03-asset-details-02.png" alt="Detalhes do Ativo - Indicadores e Valuation" width="900" />
+  <br /><br />
+  <img src="docs/screenshots/03-asset-details-03.png" alt="Detalhes do Ativo - Proventos e Histórico Diário" width="900" />
 </p>
 
 ---
 
-### 03 — Detalhes do Ativo (Página Completa)
-Painel completo de análise com gráfico histórico de cotações, indicadores de Dividend Yield, máximas e mínimas das 52 semanas.
+### 03 — Carteira (Dashboard)
+Posição consolidada da carteira, gráfico de evolução patrimonial, gráfico de rosca de alocação por classe, proventos e carrossel de ativos.
 
 <p align="center">
-  <img src="docs/screenshots/03-asset-details-full.png" alt="Detalhes do Ativo" width="900" />
+  <img src="docs/screenshots/04-portfolio-01.png" alt="Carteira - Patrimônio e Alocação" width="900" />
+  <br /><br />
+  <img src="docs/screenshots/04-portfolio-02.png" alt="Carteira - Performance e Proventos Mensais" width="900" />
 </p>
 
 ---
 
-### 04 — Carteira (Página Completa)
-Posição consolidada da carteira, gráfico de evolução patrimonial, gráfico de rosca de alocação por classe e carrossel de ativos em carteira.
-
-<p align="center">
-  <img src="docs/screenshots/04-portfolio-full.png" alt="Carteira Dashboard" width="900" />
-</p>
-
----
-
-### 05 — Modal de Adicionar Novo Ativo
+### 04 — Modal de Adicionar Novo Ativo
 Modal de cadastro inteligente com busca por ticker, consulta de cotação em tempo real e cálculo instantâneo do valor total investido.
 
 <p align="center">
@@ -84,11 +83,11 @@ Modal de cadastro inteligente com busca por ticker, consulta de cotação em tem
 
 ---
 
-### 06 — Extrato de Negociações (Página Completa)
-Histórico de compras e vendas consolidado, cards de volume negociado, barra de filtros com período e tabela com exportação CSV.
+### 05 — Extrato de Negociações
+Histórico de compras e vendas consolidado, cards de volume negociado, barra de filtros com período e tabela com exportação CSV/PDF.
 
 <p align="center">
-  <img src="docs/screenshots/06-extract-full.png" alt="Extrato de Negociações" width="900" />
+  <img src="docs/screenshots/06-extract.png" alt="Extrato de Negociações" width="900" />
 </p>
 
 ---
