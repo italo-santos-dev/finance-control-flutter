@@ -43,7 +43,7 @@ No cenário atual, investidores gerenciam ativos fragmentados entre diversas cor
 Visão geral dos mercados, índices mundiais (IBOVESPA, S&P 500, NASDAQ), cotação do Bitcoin e últimas notícias econômicas integradas.
 
 <p align="center">
-  <img src="assets/images/readme/home_page.png" alt="Home Page" width="850" />
+  <img src="assets/images/readme/home_page.png" alt="Home Page" width="900" />
 </p>
 
 ---
@@ -52,16 +52,16 @@ Visão geral dos mercados, índices mundiais (IBOVESPA, S&P 500, NASDAQ), cotaç
 Posição consolidada da carteira, gráfico de evolução patrimonial, gráfico de rosca de alocação por classe e carrossel de ativos em carteira.
 
 <p align="center">
-  <img src="assets/images/readme/active_page.png" alt="Carteira Dashboard" width="850" />
+  <img src="assets/images/readme/active_page.png" alt="Carteira Dashboard" width="900" />
 </p>
 
 ---
 
-### 03. Detalhes do Ativo & Análise
-Painel completo de análise com gráfico histórico de cotações, indicadores de Dividend Yield, máximas e mínimas.
+### 03. Detalhes do Ativo & Análise Técnica
+Painel completo de análise com gráfico histórico de cotações, indicadores de Dividend Yield, máximas e mínimas das 52 semanas.
 
 <p align="center">
-  <img src="assets/images/readme/edit_active_page.png" alt="Detalhes do Ativo" width="850" />
+  <img src="assets/images/readme/edit_active_page.png" alt="Detalhes do Ativo" width="900" />
 </p>
 
 ---
@@ -70,16 +70,16 @@ Painel completo de análise com gráfico histórico de cotações, indicadores d
 Modal de cadastro inteligente com busca por ticker, consulta de cotação em tempo real e cálculo instantâneo do valor total investido.
 
 <p align="center">
-  <img src="assets/images/readme/add_active_page.png" alt="Adicionar Ativo" width="850" />
+  <img src="assets/images/readme/add_active_page.png" alt="Adicionar Ativo" width="900" />
 </p>
 
 ---
 
-### 05. Acesso Rápido na Home
-Fluxo de cadastro e busca rápida de ativos diretamente pelo painel inicial da aplicação.
+### 05. Extrato de Negociações
+Histórico de compras e vendas consolidado, cards de volume negociado, barra de filtros com período e tabela com exportação CSV.
 
 <p align="center">
-  <img src="assets/images/readme/add_home_page.png" alt="Adicionar Ativo na Home" width="850" />
+  <img src="assets/images/readme/extract_page.png" alt="Extrato de Negociações" width="900" />
 </p>
 
 ---
@@ -88,7 +88,7 @@ Fluxo de cadastro e busca rápida de ativos diretamente pelo painel inicial da a
 Tela de abertura com inicialização de banco de dados, injeção de dependências e carregamento do portfólio.
 
 <p align="center">
-  <img src="assets/images/readme/splash_page.png" alt="Splash Page" width="850" />
+  <img src="assets/images/readme/splash_page.png" alt="Splash Page" width="900" />
 </p>
 
 ---
