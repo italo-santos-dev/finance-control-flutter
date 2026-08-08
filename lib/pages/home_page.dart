@@ -615,66 +615,6 @@ class _HomePageState extends State<HomePage> {
           else
             const Spacer(),
           const SizedBox(width: 8),
-          if (MediaQuery.of(context).size.width > 800) ...[
-            TextButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.dashboard_outlined, size: 14, color: AppColors.primaryBlue),
-              label: const Text('Mercados', style: TextStyle(color: AppColors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-            ),
-            const SizedBox(width: 2),
-            TextButton.icon(
-              onPressed: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => ActivePage()));
-              },
-              icon: const Icon(Icons.pie_chart_outline, size: 14, color: AppColors.emeraldGreen),
-              label: const Text('Carteira', style: TextStyle(color: Colors.grey, fontSize: 11)),
-            ),
-            const SizedBox(width: 2),
-            TextButton.icon(
-              onPressed: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const ExtratoPage()));
-              },
-              icon: const Icon(Icons.receipt_long_outlined, size: 14, color: AppColors.blueAccent),
-              label: const Text('Extrato', style: TextStyle(color: Colors.grey, fontSize: 11)),
-            ),
-            const SizedBox(width: 6),
-            ElevatedButton.icon(
-              onPressed: () {
-                AddAssetModal.show(context, existingAssets: []);
-              },
-              icon: const Icon(Icons.add, size: 14),
-              label: const Text('Novo Ativo', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryBlue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-              ),
-            ),
-          ] else ...[
-            IconButton(
-              tooltip: 'Carteira',
-              icon: const Icon(Icons.pie_chart_outline, color: AppColors.emeraldGreen, size: 18),
-              onPressed: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => ActivePage()));
-              },
-            ),
-            IconButton(
-              tooltip: 'Extrato',
-              icon: const Icon(Icons.receipt_long_outlined, color: AppColors.blueAccent, size: 18),
-              onPressed: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const ExtratoPage()));
-              },
-            ),
-            IconButton(
-              tooltip: 'Novo Ativo',
-              icon: const Icon(Icons.add_circle, color: AppColors.primaryBlue, size: 20),
-              onPressed: () {
-                AddAssetModal.show(context, existingAssets: []);
-              },
-            ),
-          ],
-          const SizedBox(width: 8),
           // Notification Bell
           Stack(
             children: [
