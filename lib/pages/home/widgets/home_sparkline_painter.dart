@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-// Sparkline Custom Painter for market quote trends
+/// Sparkline Custom Painter for market quote trends
 class SparklinePainter extends CustomPainter {
   final List<double> data;
   final Color color;

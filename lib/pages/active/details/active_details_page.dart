@@ -12,6 +12,15 @@ import 'package:flutter_investment_control/services/apis/api_stock_indicators.da
 import 'package:flutter_investment_control/services/apis/api_stocks_dividends.dart';
 import 'package:flutter_investment_control/services/apis/api_stocks_historicals.dart';
 import 'package:flutter_investment_control/services/apis/api_stocks_ibovespa.dart';
+import 'package:flutter_investment_control/pages/active/details/widgets/active_details_dividend_history.dart';
+import 'package:flutter_investment_control/pages/active/details/widgets/active_details_fundamentals_card.dart';
+import 'package:flutter_investment_control/pages/active/details/widgets/active_details_graham_card.dart';
+import 'package:flutter_investment_control/pages/active/details/widgets/active_details_header.dart';
+import 'package:flutter_investment_control/pages/active/details/widgets/active_details_peer_comparison.dart';
+import 'package:flutter_investment_control/pages/active/details/widgets/active_details_price_chart.dart';
+import 'package:flutter_investment_control/pages/active/details/widgets/active_details_price_history_table.dart';
+import 'package:flutter_investment_control/pages/active/details/widgets/active_details_related_news.dart';
+import 'package:flutter_investment_control/pages/active/details/widgets/active_details_sector_peers.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
 

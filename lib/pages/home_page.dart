@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -14,15 +13,13 @@ import 'package:flutter_investment_control/services/apis/api_news_service.dart';
 import 'package:flutter_investment_control/services/apis/api_stocks_ibovespa.dart';
 import 'package:flutter_investment_control/services/apis/global_stocks_service.dart';
 import 'package:flutter_investment_control/widgets/adverts/adverts_widget.dart';
-import 'package:flutter_investment_control/widgets/btc/chart_page.dart';
+import 'package:flutter_investment_control/pages/home/widgets/home_chart_page.dart';
 import 'package:flutter_investment_control/pages/active/active_page.dart';
 import 'package:flutter_investment_control/widgets/buttons/modern_cta_button.dart';
-import 'package:flutter_investment_control/widgets/buttons/modern_see_all_button.dart';
-import 'package:flutter_investment_control/widgets/home/sparkline_painter.dart';
-import 'package:flutter_investment_control/widgets/home/stock_ticker_widget.dart';
+import 'package:flutter_investment_control/pages/home/widgets/home_sparkline_painter.dart';
+import 'package:flutter_investment_control/pages/home/widgets/home_stock_ticker_widget.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shimmer/shimmer.dart';

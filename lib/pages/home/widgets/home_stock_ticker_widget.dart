@@ -10,10 +10,10 @@ class StockTickerWidget extends StatefulWidget {
   final Function(Active) onStockTap;
 
   const StockTickerWidget({
-    Key? key,
+    super.key,
     required this.stocks,
     required this.onStockTap,
-  }) : super(key: key);
+  });
 
   @override
   State<StockTickerWidget> createState() => _StockTickerWidgetState();
@@ -38,7 +38,7 @@ class _StockTickerWidgetState extends State<StockTickerWidget> {
       if (!_scrollController.hasClients) return;
       double maxScroll = _scrollController.position.maxScrollExtent;
       double currentScroll = _scrollController.offset;
-      double delta = 1.0; // scroll speed px per step
+      double delta = 1.0;
 
       if (currentScroll >= maxScroll) {
         _scrollController.jumpTo(0.0);
@@ -62,7 +62,6 @@ class _StockTickerWidgetState extends State<StockTickerWidget> {
       return const SizedBox.shrink();
     }
 
-    // Duplicate list 3 times for endless seamless scrolling effect
     final displayList = [...validStocks, ...validStocks, ...validStocks];
 
     return SizedBox(
@@ -98,7 +97,6 @@ class _StockTickerWidgetState extends State<StockTickerWidget> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Stock Symbol
                       Text(
                         stock.symbol,
                         style: const TextStyle(
@@ -109,7 +107,6 @@ class _StockTickerWidgetState extends State<StockTickerWidget> {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      // Stock Price
                       Text(
                         _realFormat.format(stock.lastPrice),
                         style: const TextStyle(
@@ -119,7 +116,6 @@ class _StockTickerWidgetState extends State<StockTickerWidget> {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      // Dividend Yield Badge
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                         decoration: BoxDecoration(

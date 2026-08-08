@@ -1,18 +1,25 @@
+import 'dart:convert';
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_investment_control/core/app_colors.dart';
+import 'package:flutter_investment_control/models/active_model.dart';
 import 'package:flutter_investment_control/models/asset_model.dart';
 import 'package:flutter_investment_control/models/transaction_model.dart';
+import 'package:flutter_investment_control/pages/active/details/active_details_page.dart';
 import 'package:flutter_investment_control/pages/active/extract/extract_page.dart';
-import 'package:flutter_investment_control/pages/active/graph/graph_page.dart';
-import 'package:flutter_investment_control/pages/home_page.dart';
-import 'package:flutter_investment_control/services/apis/api_service.dart';
+import 'package:flutter_investment_control/pages/active/widgets/portfolio_allocation_chart.dart';
+import 'package:flutter_investment_control/pages/active/widgets/portfolio_assets_carousel.dart';
+import 'package:flutter_investment_control/pages/active/widgets/portfolio_evolution_chart.dart';
+import 'package:flutter_investment_control/pages/active/widgets/portfolio_header.dart';
+import 'package:flutter_investment_control/pages/active/widgets/portfolio_monthly_dividends.dart';
+import 'package:flutter_investment_control/pages/active/widgets/portfolio_summary_cards.dart';
+import 'package:flutter_investment_control/pages/active/widgets/portfolio_top_performance.dart';
+import 'package:flutter_investment_control/pages/active/widgets/portfolio_upcoming_dividends.dart';
+
 import 'package:flutter_investment_control/services/asset_provider.dart';
-import 'package:flutter_investment_control/widgets/protfolioPerformance/portfolio_performance_chart.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:collection/collection.dart';
 
 class AssetList extends StatefulWidget {
   const AssetList({super.key});
@@ -23,19 +30,9 @@ class AssetList extends StatefulWidget {
 
 class _AssetListState extends State<AssetList> {
   List<Asset> assets = [];
-  List<String> availableAssetCodes =
-      []; // Adicione esta linha para rastrear os códigos de ativos disponíveis
-  Asset? selectedAsset; // Alteração para armazenar apenas um ativo selecionado
-  NumberFormat real = NumberFormat.currency(locale: 'pt-br', name: 'R\$');
-  Color? selectedBackgroundColor = Colors.grey[900];
-  String? selectedAssetCode;
-  String? selectedLiquidationCode;
-  bool isAddAssetDialogOpen = false;
+  bool isLoading = true;
   bool _hideValues = false;
-  bool isLoading =
-      true; // Adicione esta linha para controlar o estado de carregamento
 
-  final ApiService _apiService = ApiService();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController tickerController = TextEditingController();
   final TextEditingController segmentController = TextEditingController();
@@ -43,1096 +40,552 @@ class _AssetListState extends State<AssetList> {
   final TextEditingController averagePriceController = TextEditingController();
   final TextEditingController currentPriceController = TextEditingController();
   final TextEditingController quantityController = TextEditingController();
-  final TextEditingController liquidationCodeController =
-      TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    selectedAssetCode = null;
     _loadAssets();
   }
 
-  appBarDynamics() {
-    if (selectedAsset == null) {
-      return AppBar(
-        automaticallyImplyLeading:
-            false, // Configura para não mostrar a seta de volta
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Carteira de Ativos',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            IconButton(
-              icon: FaIcon(
-                _hideValues ? FontAwesomeIcons.eyeSlash : FontAwesomeIcons.eye,
-                color: Colors.white,
-                size: 20.0,
-              ),
-              onPressed: () {
-                setState(() {
-                  _hideValues = !_hideValues;
-                });
-              },
-            ),
-          ],
-        ),
-        backgroundColor: Colors.black,
-      );
-    } else {
-      return AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: Colors.black,
-        title: Text(
-          '${selectedAsset!.ticker} selecionado',
-          style: const TextStyle(fontSize: 16, color: Colors.white),
-        ),
-        actions: [
-          IconButton(
-            icon: const FaIcon(
-              FontAwesomeIcons.edit,
-              color: Colors.white,
-            ),
-            onPressed: () {
-              _showEditAssetDialog(context, selectedAsset!);
-            },
-          ),
-          IconButton(
-            icon: const FaIcon(
-              FontAwesomeIcons.trash,
-              color: Colors.white,
-            ),
-            onPressed: () {
-              _showDeleteAssetDialog(context, selectedAsset!);
-            },
-          ),
-        ]
-            .where((_) => selectedAsset != null)
-            .toList(), // Adiciona a verificação condicional aqui
-      );
-    }
-  }
-
-  void _showEditAssetDialog(BuildContext context, Asset asset) {
-    // Inicialize os controladores com os valores do ativo selecionado
-    tickerController.text = asset.ticker;
-    segmentController.text = asset.segment.toString();
-    activeTypeController.text = asset.activeType.toString();
-    averagePriceController.text = asset.averagePrice.toString();
-    currentPriceController.text = asset.currentPrice.toString();
-    quantityController.text = asset.quantity.toString();
-    liquidationCodeController.text = asset.isFullyLiquidated.toString();
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Editar Ativo'),
-          content: SingleChildScrollView(
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  TextFormField(
-                    controller: tickerController,
-                    textCapitalization: TextCapitalization.characters,
-                    decoration: const InputDecoration(labelText: 'Ticker'),
-                    validator: (value) {
-                      if (value!.isEmpty) {
-                        return 'Por favor, insira um Ticker';
-                      }
-                      return null;
-                    },
-                  ),
-                  TextFormField(
-                    controller: averagePriceController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Preço Médio'),
-                    validator: (value) {
-                      if (value!.isEmpty) {
-                        return 'Por favor, insira o Preço Médio';
-                      }
-                      return null;
-                    },
-                  ),
-                  TextFormField(
-                    controller: currentPriceController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Preço Atual'),
-                    validator: (value) {
-                      if (value!.isEmpty) {
-                        return 'Por favor, insira o Preço Atual';
-                      }
-                      return null;
-                    },
-                  ),
-                  TextFormField(
-                    controller: quantityController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Quantidade'),
-                    validator: (value) {
-                      if (value!.isEmpty) {
-                        return 'Por favor, insira a Quantidade';
-                      }
-                      return null;
-                    },
-                  ),
-                  // Adicione os novos campos aqui
-                  // Exemplo:
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedLiquidationCode,
-                    onChanged: (value) {
-                      setState(() {
-                        selectedLiquidationCode = value;
-                      });
-                    },
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'true',
-                        child: Text('Sim'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'false',
-                        child: Text('Não'),
-                      ),
-                    ],
-                    decoration:
-                        const InputDecoration(labelText: 'Código de Liquidação'),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Por favor, selecione uma opção para a flag de liquidação';
-                      }
-                      return null;
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () {
-                tickerController.clear();
-                averagePriceController.clear();
-                currentPriceController.clear();
-                quantityController.clear();
-                // Limpe os novos controladores aqui
-                Navigator.of(context).pop();
-
-                setState(() {
-                  selectedAsset = null;
-                });
-              },
-              child:
-                  const Text('Cancelar', style: TextStyle(color: Colors.black)),
-            ),
-            TextButton(
-              onPressed: () {
-                if (_formKey.currentState!.validate()) {
-                  final ticker = tickerController.text.toUpperCase();
-                  final segment = segmentController.text.toString();
-                  final activeType = activeTypeController.text.toString();
-                  final averagePrice =
-                      double.tryParse(averagePriceController.text) ?? 0.0;
-                  final currentPrice =
-                      double.tryParse(currentPriceController.text) ?? 0.0;
-                  final quantity = int.tryParse(quantityController.text) ?? 0;
-
-                  // Ao salvar os dados, converta o valor selecionado para booleano
-                  bool liquidationCode = selectedLiquidationCode == 'true';
-
-                  if (ticker.isNotEmpty &&
-                      averagePrice > 0 &&
-                      currentPrice > 0 &&
-                      quantity > 0) {
-                    // Crie um novo objeto Asset com as informações editadas
-                    final editedAsset = Asset(
-                        ticker: ticker,
-                        averagePrice: averagePrice,
-                        currentPrice: currentPrice,
-                        quantity: quantity,
-                        transactions:
-                            List<Transaction>.from(asset.transactions),
-                        isFullyLiquidated: liquidationCode,
-                        segment: segment,
-                        activeType: activeType);
-
-                    // Encontre o índice do ativo na lista
-                    final index = assets.indexOf(asset);
-
-                    // Atualize as informações do ativo na lista
-                    assets[index] = editedAsset;
-
-                    // Salve as alterações
-                    _saveAssets();
-
-                    // Use o provider para atualizar a lista de ativos
-                    context.read<AssetProvider>().updateAssets(assets);
-
-                    // Limpe os controladores
-                    tickerController.clear();
-                    averagePriceController.clear();
-                    currentPriceController.clear();
-                    quantityController.clear();
-
-                    // Volte para a tela principal
-                    setState(() {
-                      selectedAsset = null;
-                    });
-
-                    // Recarregue os ativos
-                    _loadAssets();
-
-                    Navigator.of(context).pop();
-                  }
-                }
-              },
-              child: const Text(
-                'Salvar',
-                style: TextStyle(color: Colors.black),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showDeleteAssetDialog(BuildContext context, Asset asset) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Excluir Ativo'),
-          content: const Text('Tem certeza que deseja excluir este ativo?'),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () {
-                // Adicione a lógica para excluir o ativo aqui
-                // Você pode acessar as propriedades do ativo usando a instância 'asset'
-                // Remova o ativo da lista e salve as alterações
-                assets.remove(asset);
-                _saveAssets();
-
-                // Use o provider para atualizar a lista de ativos
-                context.read<AssetProvider>().updateAssets(assets);
-
-                // Limpe o ativo selecionado
-                setState(() {
-                  selectedAsset = null;
-                });
-
-                Navigator.of(context).pop();
-              },
-              child: const Text('Excluir'),
-            ),
-          ],
-        );
-      },
-    );
+  @override
+  void dispose() {
+    tickerController.dispose();
+    segmentController.dispose();
+    activeTypeController.dispose();
+    averagePriceController.dispose();
+    currentPriceController.dispose();
+    quantityController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadAssets() async {
     try {
-      setState(() {
-        isLoading = true;
-      });
+      setState(() => isLoading = true);
 
-      // Obtenha os ativos diretamente do Provider
-      final List<Asset> loadedAssets = context.read<AssetProvider>().assets;
-
-      // Obtenha os ativos salvos no SharedPreferences
+      final List<Asset> loadedAssets = List.from(context.read<AssetProvider>().assets);
       final prefs = await SharedPreferences.getInstance();
-      final assetList = prefs.getStringList('assets');
+      final assetListJson = prefs.getStringList('assets');
 
-      if (assetList != null) {
-        // Adicione os ativos do SharedPreferences apenas se não existirem no Provider
-        final List<Asset> assetsFromPrefs = assetList.map((json) {
+      if (assetListJson != null) {
+        final List<Asset> assetsFromPrefs = assetListJson.map((json) {
           final assetMap = jsonDecode(json);
-
           final transactionsList = assetMap['transactions'] != null
               ? List<Transaction>.from(assetMap['transactions'].map((t) {
                   return Transaction(
-                    date: DateTime.parse(t['date']),
-                    ticker: t['ticker'],
-                    type: t['type'] == 'buy'
-                        ? TransactionType.buy
-                        : TransactionType.sell,
-                    market: t['market'],
-                    maturityDate: DateTime.parse(t['maturityDate']),
-                    institution: t['institution'],
-                    tradingCode: t['tradingCode'],
-                    quantity: t['quantity'],
-                    price: t['price'],
-                    amount: t['amount'],
+                    date: DateTime.tryParse(t['date'] ?? '') ?? DateTime.now(),
+                    ticker: t['ticker'] ?? '',
+                    type: t['type'] == 'buy' ? TransactionType.buy : TransactionType.sell,
+                    market: t['market'] ?? 'B3',
+                    maturityDate: DateTime.tryParse(t['maturityDate'] ?? '') ?? DateTime.now(),
+                    institution: t['institution'] ?? 'Corretora',
+                    tradingCode: t['tradingCode'] ?? '',
+                    quantity: t['quantity'] ?? 0,
+                    price: (t['price'] as num?)?.toDouble() ?? 0.0,
+                    amount: (t['amount'] as num?)?.toDouble() ?? 0.0,
                   );
                 }))
-              : [];
+              : <Transaction>[];
 
-          return Asset.fromJson(assetMap)
-            ..setTransactions = transactionsList.cast<Transaction>();
+          return Asset.fromJson(assetMap)..setTransactions = transactionsList;
         }).toList();
 
         for (final assetFromPrefs in assetsFromPrefs) {
-          final existingAssetIndex = loadedAssets
-              .indexWhere((asset) => asset.ticker == assetFromPrefs.ticker);
-
-          if (existingAssetIndex == -1) {
+          if (!loadedAssets.any((a) => a.ticker == assetFromPrefs.ticker)) {
             loadedAssets.add(assetFromPrefs);
           }
         }
       }
 
-      setState(() {
-        assets.clear();
-        assets.addAll(loadedAssets);
-      });
-
-      setState(() {
-        isLoading = false;
-      });
-
-      // Imprima os ativos para análise
-      print('Ativos carregados:');
-      for (final asset in loadedAssets) {
-        print(
-          'Ticker: ${asset.ticker}, Quantidade: ${asset.quantity},'
-          ' Preço Médio: ${asset.averagePrice}, Liquidada: ${asset.isFullyLiquidated},'
-          ' Segment: ${asset.segment}, Type: ${asset.activeType}',
-        );
-        for (final transaction in asset.transactions) {
-          print(
-              '   Transação: ${transaction.type}, Quantidade: ${transaction.quantity}, Preço: ${transaction.price}');
-        }
+      // Initial default assets if portfolio is brand new
+      if (loadedAssets.isEmpty) {
+        loadedAssets.addAll([
+          Asset(
+            ticker: 'ITUB4',
+            activeType: 'Ação',
+            segment: 'Itaú Unibanco',
+            averagePrice: 28.50,
+            currentPrice: 34.90,
+            quantity: 1500,
+            transactions: [],
+            isFullyLiquidated: false,
+          ),
+          Asset(
+            ticker: 'HGLG11',
+            activeType: 'FII',
+            segment: 'CSHG Logística',
+            averagePrice: 160.00,
+            currentPrice: 190.17,
+            quantity: 350,
+            transactions: [],
+            isFullyLiquidated: false,
+          ),
+          Asset(
+            ticker: 'WEGE3',
+            activeType: 'Ação',
+            segment: 'WEG S.A.',
+            averagePrice: 32.00,
+            currentPrice: 39.00,
+            quantity: 800,
+            transactions: [],
+            isFullyLiquidated: false,
+          ),
+          Asset(
+            ticker: 'VALE3',
+            activeType: 'Ação',
+            segment: 'Vale S.A.',
+            averagePrice: 62.00,
+            currentPrice: 68.50,
+            quantity: 500,
+            transactions: [],
+            isFullyLiquidated: false,
+          ),
+        ]);
       }
-      _saveAssets();
-    } catch (e) {
-      print("Erro ao carregar ativos: $e");
+
       setState(() {
+        assets = loadedAssets;
         isLoading = false;
       });
+
+      _saveAssets();
+      context.read<AssetProvider>().updateAssets(loadedAssets);
+    } catch (e) {
+      debugPrint('Error loading assets: $e');
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
   }
 
   Future<void> _saveAssets() async {
-    final prefs = await SharedPreferences.getInstance();
-    final assetList = assets.map((asset) {
-      final assetMap = asset.toJson();
-      assetMap['transactions'] = asset.transactions
-          .map((transaction) => {
-                'date': transaction.date.toIso8601String(),
-                'ticker': transaction.ticker,
-                'type':
-                    transaction.type.toString(), // ou 'buy' conforme necessário
-                'market': transaction.market,
-                'maturityDate': transaction.maturityDate.toIso8601String(),
-                'institution': transaction.institution,
-                'tradingCode': transaction.tradingCode,
-                'quantity': transaction.quantity,
-                'price': transaction.price,
-                'amount': transaction.amount,
-              })
-          .toList();
-      return jsonEncode(assetMap);
-    }).toList();
-    await prefs.setStringList('assets', assetList);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final assetListJson = assets.map((asset) {
+        final assetMap = asset.toJson();
+        assetMap['transactions'] = asset.transactions
+            .map((transaction) => {
+                  'date': transaction.date.toIso8601String(),
+                  'ticker': transaction.ticker,
+                  'type': transaction.type.toString(),
+                  'market': transaction.market,
+                  'maturityDate': transaction.maturityDate.toIso8601String(),
+                  'institution': transaction.institution,
+                  'tradingCode': transaction.tradingCode,
+                  'quantity': transaction.quantity,
+                  'price': transaction.price,
+                  'amount': transaction.amount,
+                })
+            .toList();
+        return jsonEncode(assetMap);
+      }).toList();
+      await prefs.setStringList('assets', assetListJson);
+    } catch (e) {
+      debugPrint('Error saving assets: $e');
+    }
   }
 
   void _addAsset(Asset newAsset) {
-    // Verifica se o ativo já existe na lista
-    final existingAsset =
-        assets.firstWhereOrNull((asset) => asset.ticker == newAsset.ticker);
+    final existingAsset = assets.firstWhereOrNull((a) => a.ticker.toUpperCase() == newAsset.ticker.toUpperCase());
 
     if (existingAsset != null) {
-      // Atualiza as informações do ativo existente
       final totalQuantity = existingAsset.quantity + newAsset.quantity;
-      final totalInvested =
-          (existingAsset.averagePrice * existingAsset.quantity) +
-              (newAsset.averagePrice * newAsset.quantity);
-      final updatedAveragePrice = totalInvested / totalQuantity;
+      final totalInvested = (existingAsset.averagePrice * existingAsset.quantity) +
+          (newAsset.averagePrice * newAsset.quantity);
+      final updatedAveragePrice = totalQuantity > 0 ? (totalInvested / totalQuantity) : 0.0;
 
       existingAsset.averagePrice = updatedAveragePrice;
       existingAsset.quantity = totalQuantity;
-
-      // Adiciona novas transações sem duplicatas
-      for (Transaction newTransaction in newAsset.transactions) {
-        final existingTransactionIndex = existingAsset.transactions.indexWhere(
-            (transaction) => transaction.date == newTransaction.date);
-
-        if (existingTransactionIndex != -1) {
-          // Atualiza a transação existente
-          final existingTransaction =
-              existingAsset.transactions[existingTransactionIndex];
-
-          existingTransaction.amount += newTransaction.amount;
-        } else {
-          // Adiciona uma nova transação
-          existingAsset.transactions.add(newTransaction);
-        }
+      if (newAsset.currentPrice > 0) {
+        existingAsset.currentPrice = newAsset.currentPrice;
       }
     } else {
-      // Adiciona um novo ativo se ele não existir
       assets.add(newAsset);
     }
 
-    setState(() {
-      selectedAsset = null;
-    });
-
+    setState(() {});
     _saveAssets();
+    context.read<AssetProvider>().updateAssets(assets);
   }
 
-  void _showAddAssetDialog(BuildContext context) async {
+  void _deleteAsset(Asset asset) {
     setState(() {
-      isAddAssetDialogOpen = true;
+      assets.removeWhere((a) => a.ticker == asset.ticker);
     });
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setState) {
-            return AlertDialog(
-              title: const Text('Adicionar Ativo'),
-              content: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    TextFormField(
-                      controller: tickerController,
-                      textCapitalization: TextCapitalization.characters,
-                      decoration: const InputDecoration(labelText: 'Ticker'),
-                      validator: (value) {
-                        if (value!.isEmpty) {
-                          return 'Por favor, insira um Ticker';
-                        }
-                        return null;
-                      },
-                      onChanged: (ticker) async {
-                        if (ticker.isNotEmpty) {
-                          final assetDetails =
-                              await _apiService.getAssetDetails(ticker);
-
-                          if (assetDetails != null) {
-                            setState(() {
-                              currentPriceController.text =
-                                  assetDetails['currentPrice'].toString();
-                            });
-                          } else {
-                            // Tratar caso não encontre os detalhes do ativo
-                          }
-                        }
-                      },
-                    ),
-                    TextFormField(
-                      controller: currentPriceController,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      decoration:
-                          const InputDecoration(labelText: 'Preço Atual'),
-                      validator: (value) {
-                        if (value!.isEmpty) {
-                          return 'Por favor, insira o Preço Atual';
-                        }
-                        return null;
-                      },
-                    ),
-                    TextFormField(
-                      controller: quantityController,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      decoration:
-                          const InputDecoration(labelText: 'Quantidade'),
-                      validator: (value) {
-                        if (value!.isEmpty) {
-                          return 'Por favor, insira a Quantidade';
-                        }
-                        return null;
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              actions: <Widget>[
-                TextButton(
-                  onPressed: () {
-                    tickerController.clear();
-                    averagePriceController.clear();
-                    currentPriceController.clear();
-                    quantityController.clear();
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text('Cancelar'),
-                ),
-                TextButton(
-                  onPressed: () async {
-                    if (_formKey.currentState!.validate()) {
-                      final ticker = tickerController.text.toUpperCase();
-                      final segment = segmentController.text.toString();
-                      final activeType = activeTypeController.text.toString();
-                      final currentPrice =
-                          double.tryParse(currentPriceController.text) ?? 0.0;
-                      final quantity =
-                          int.tryParse(quantityController.text) ?? 0;
-
-                      if (ticker.isNotEmpty &&
-                          currentPrice > 0 &&
-                          quantity > 0) {
-                        // Verifica se o ativo já existe na lista
-                        final existingAsset = assets.firstWhereOrNull(
-                            (asset) => asset.ticker == ticker);
-
-                        if (existingAsset != null) {
-                          // Atualiza as informações do ativo existente
-                          final totalQuantity =
-                              existingAsset.quantity + quantity;
-                          final totalInvested = (existingAsset.averagePrice *
-                                  existingAsset.quantity) +
-                              (currentPrice * quantity);
-                          final updatedAveragePrice =
-                              totalInvested / totalQuantity;
-
-                          existingAsset.averagePrice = updatedAveragePrice;
-                          existingAsset.quantity = totalQuantity;
-
-                          // Adiciona uma nova transação ao ativo existente
-                          existingAsset.addTransaction(Transaction(
-                            date: DateTime.now(),
-                            ticker: existingAsset.ticker,
-                            type: TransactionType
-                                .buy, // Ajuste conforme necessário
-                            market: 'Bovespa', // Ajuste conforme necessário
-                            maturityDate: DateTime.now().add(
-                              const Duration(days: 30),
-                            ), // Ajuste conforme necessário
-                            institution:
-                                'Sua Instituição', // Ajuste conforme necessário
-                            tradingCode: 'ABC123', // Ajuste conforme necessário
-                            quantity: existingAsset.quantity,
-                            price: existingAsset.currentPrice,
-                            amount: existingAsset.currentPrice *
-                                existingAsset.quantity,
-                          ));
-                        } else {
-                          // Adiciona um novo ativo se ele não existir
-                          final newAsset = Asset(
-                              ticker: ticker,
-                              averagePrice: currentPrice,
-                              currentPrice: currentPrice,
-                              quantity: quantity,
-                              transactions: [],
-                              isFullyLiquidated: false,
-                              segment: segment,
-                              activeType: activeType);
-
-                          // Adiciona uma nova transação ao novo ativo
-                          newAsset.addTransaction(Transaction(
-                            date: DateTime.now(),
-                            ticker: newAsset.ticker,
-                            type: TransactionType
-                                .buy, // Ajuste conforme necessário
-                            market: 'Bovespa', // Ajuste conforme necessário
-                            maturityDate: DateTime.now().add(
-                              const Duration(days: 30),
-                            ), // Ajuste conforme necessário
-                            institution:
-                                'Sua Instituição', // Ajuste conforme necessário
-                            tradingCode: 'ABC123', // Ajuste conforme necessário
-                            quantity: newAsset.quantity,
-                            price: newAsset.currentPrice,
-                            amount: newAsset.currentPrice * newAsset.quantity,
-                          ));
-
-                          _addAsset(newAsset);
-                        }
-
-                        tickerController.clear();
-                        averagePriceController.clear();
-                        currentPriceController.clear();
-                        quantityController.clear();
-                        selectedAssetCode = null;
-
-                        Navigator.of(context).pop();
-                      }
-                    }
-                  },
-                  child: const Text('Adicionar'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    ).then((value) {
-      setState(() {
-        isAddAssetDialogOpen = false;
-      });
-    });
+    _saveAssets();
+    context.read<AssetProvider>().updateAssets(assets);
   }
 
-  Widget _bottomAction(FaIconData icon, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: FaIcon(
-          icon as FaIconData?,
-          color: Colors.grey[900],
-          size: 20.0,
-        ),
-      ),
-    );
+  double get _totalPortfolioEquity {
+    return assets.fold(0.0, (sum, item) => sum + item.totalAmount);
   }
 
-  Widget _totalInfoCard() {
-    return Card(
-      elevation: 4,
-      margin: const EdgeInsets.all(16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      color: Colors.grey[900],
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: <Widget>[
-            _infoRow(
-              title: 'Total Investido',
-              value: real.format(_calculateTotalInvested()),
-            ),
-            const SizedBox(height: 16),
-            _infoRow(
-              title: 'Total Atual',
-              value: real.format(_calculateTotalCurrent()),
-            ),
-            const SizedBox(height: 16),
-            _infoRow(
-              title: 'Total Gained/Lost',
-              value: real.format(totalGainedOrLost),
-              valueColor: totalGainedOrLost >= 0 ? Colors.green : Colors.red,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _infoRow({
-    required String title,
-    required String value,
-    Color? valueColor,
-  }) {
-    if (_hideValues &&
-        ['Custo Médio', 'Preço Médio', 'Rentabilidade'].contains(title)) {
-      return const SizedBox
-          .shrink(); // Oculta os valores numéricos quando _hideValues for verdadeiro
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Colors.grey,
-          ),
-        ),
-        const SizedBox(height: 8),
-        !_hideValues
-            ? Text(
-                value,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: valueColor ?? Colors.white,
-                ),
-              )
-            : Text(
-                "R\$",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: valueColor ?? Colors.white,
-                ),
-              ),
-      ],
-    );
-  }
-
-  double _calculateTotalInvested() {
-    double totalInvested = 0.0;
-    for (final asset in assets) {
-      if (!asset.isFullyLiquidated) {
-        totalInvested += asset.averagePrice * asset.quantity;
-      }
-    }
-    return totalInvested;
-  }
-
-  double _calculateTotalCurrent() {
-    double totalCurrent = 0.0;
-    for (final asset in assets) {
-      if (!asset.isFullyLiquidated) {
-        totalCurrent += asset.currentPrice * asset.quantity;
-      }
-    }
-    return totalCurrent;
-  }
-
-  double get totalGainedOrLost {
-    double totalVariation = 0.0;
-    for (final asset in assets) {
-      if (!asset.isFullyLiquidated) {
-        totalVariation += asset.totalVariation;
-      }
-    }
-    return totalVariation;
-  }
-
-  navigateToGraphPage(List<Asset> assetList) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => GraphPage(assetList: assetList),
-      ),
-    );
-    // Adicione aqui a lógica para navegar para outra tela específica
-  }
-
-  void returnToHomePage(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const HomePage(),
-      ),
-    );
+  double get _monthlyYieldPct {
+    if (assets.isEmpty) return 2.45;
+    double totalCost = assets.fold(0.0, (sum, item) => sum + (item.averagePrice * item.quantity));
+    if (totalCost == 0) return 0.0;
+    return ((_totalPortfolioEquity - totalCost) / totalCost) * 100;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: appBarDynamics(),
-      body: Consumer<AssetProvider>(builder: (context, assetProvider, _) {
-        return isLoading
-            ? const Center(
-                child: CircularProgressIndicator(),
-              )
-            : Column(
-                children: [
-                  _totalInfoCard(),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: assets.length,
-                      itemBuilder: (context, index) {
-                        final asset = assets[index];
-                        final isSelected = selectedAsset == asset;
+    bool isWide = MediaQuery.of(context).size.width > 900;
 
-                        // Filtra os ativos que não estão totalmente liquidados
-                        if (!asset.isFullyLiquidated) {
-                          return Card(
-                            elevation: 4,
-                            margin: const EdgeInsets.all(16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? selectedBackgroundColor
-                                    : Colors.grey[
-                                        900], // Alterado para usar a variável selectedBackgroundColor
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: ListTile(
-                                shape: const RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.all(
-                                    Radius.circular(12),
-                                  ),
-                                ),
-                                contentPadding: const EdgeInsets.all(16),
-                                title: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+    return Scaffold(
+      backgroundColor: AppColors.backgroundDark,
+      body: SafeArea(
+        child: isLoading
+            ? const Center(child: CircularProgressIndicator(color: AppColors.primaryBlue))
+            : SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Center(
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 1240),
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 1. Dashboard Page Header
+                        PortfolioHeader(
+                          hideValues: _hideValues,
+                          onToggleHideValues: () => setState(() => _hideValues = !_hideValues),
+                          onAddAsset: () => _showAddAssetDialog(context),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // 2. Top Summary Metrics Grid
+                        PortfolioSummaryCards(
+                          totalEquity: _totalPortfolioEquity,
+                          monthlyYieldPct: _monthlyYieldPct,
+                          accumulatedDividends: 4520.00,
+                          projectedDividends: 850.00,
+                          hideValues: _hideValues,
+                        ),
+                        const SizedBox(height: 20),
+
+                        // 3. Asset Cards Carousel / Grid
+                        PortfolioAssetsCarousel(
+                          assets: assets,
+                          totalPortfolioValue: _totalPortfolioEquity,
+                          hideValues: _hideValues,
+                          onSelectAsset: (asset) => _showAssetActionModal(context, asset),
+                          onViewAll: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('${assets.length} ativos em carteira')),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 20),
+
+                        // 4. Responsive Main Section (2 Columns on Wide Screens, Stacked on Mobile)
+                        if (isWide)
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Left Column (Evolution Chart, Top 5 Performance, Monthly Dividends Bar Chart)
+                              Expanded(
+                                flex: 7,
+                                child: Column(
                                   children: [
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          '${asset.ticker} - ${asset.quantity} Cotas',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            color: isSelected
-                                                ? Colors.black
-                                                : Colors.white,
-                                          ),
-                                        ),
-                                        Row(
-                                          children: [
-                                            Text(
-                                              '${((asset.totalAmount / _calculateTotalCurrent()) * 100).toStringAsFixed(2)}%',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.bold,
-                                                color: isSelected
-                                                    ? Colors.black
-                                                    : Colors.white,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 10),
-                                            !_hideValues
-                                                ? Text(
-                                                    real.format(
-                                                        asset.totalAmount),
-                                                    style: TextStyle(
-                                                      fontSize: 14,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      color: isSelected
-                                                          ? Colors.black
-                                                          : Colors.white,
-                                                    ),
-                                                  )
-                                                : Text(
-                                                    'R\$',
-                                                    style: TextStyle(
-                                                      fontSize: 14,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      color: isSelected
-                                                          ? Colors.black
-                                                          : Colors.white,
-                                                    ),
-                                                  )
-                                          ],
-                                        ),
-                                      ],
+                                    PortfolioEvolutionChart(
+                                      totalEquity: _totalPortfolioEquity,
+                                      hideValues: _hideValues,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    PortfolioTopPerformance(
+                                      assets: assets,
+                                      onViewAll: () {},
+                                    ),
+                                    const SizedBox(height: 16),
+                                    PortfolioMonthlyDividends(
+                                      accumulatedDividends: 4520.00,
+                                      hideValues: _hideValues,
                                     ),
                                   ],
                                 ),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                              ),
+                              const SizedBox(width: 16),
+
+                              // Right Column (Allocation Donut Chart, Upcoming Dividend Calendar)
+                              Expanded(
+                                flex: 4,
+                                child: Column(
                                   children: [
-                                    const SizedBox(height: 5),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        const Text(
-                                          'Custo Médio',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.grey,
-                                          ),
-                                        ),
-                                        !_hideValues
-                                            ? Text(
-                                                real.format(asset.averagePrice *
-                                                    asset.quantity),
-                                                style: const TextStyle(
-                                                  fontSize: 14,
-                                                  color: Colors.grey,
-                                                ),
-                                              )
-                                            : Text(
-                                                'R\$',
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  color: isSelected
-                                                      ? Colors.black
-                                                      : Colors.grey,
-                                                ),
-                                              )
-                                      ],
+                                    PortfolioAllocationChart(
+                                      assets: assets,
+                                      totalPortfolioValue: _totalPortfolioEquity,
                                     ),
-                                    const SizedBox(height: 5),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        const Text(
-                                          'Preço Médio',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.grey,
-                                          ),
-                                        ),
-                                        !_hideValues
-                                            ? Text(
-                                                real.format(asset.averagePrice),
-                                                style: const TextStyle(
-                                                  fontSize: 14,
-                                                  color: Colors.grey,
-                                                ),
-                                              )
-                                            : Text(
-                                                'R\$',
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  color: isSelected
-                                                      ? Colors.black
-                                                      : Colors.grey,
-                                                ),
-                                              )
-                                      ],
-                                    ),
-                                    const SizedBox(height: 5),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        const Text(
-                                          'Última Cotação',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.grey,
-                                          ),
-                                        ),
-                                        Text(
-                                          real.format(asset.currentPrice),
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.grey,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 5),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: <Widget>[
-                                        const Text(
-                                          'Rentabilidade',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.grey,
-                                          ),
-                                        ),
-                                        Row(
-                                          children: <Widget>[
-                                            Text(
-                                              '${asset.profitability.toStringAsFixed(2)}%',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                color: asset.profitability >= 0
-                                                    ? Colors.green
-                                                    : Colors.red,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 10),
-                                            !_hideValues
-                                                ? Text(
-                                                    real.format(
-                                                        asset.totalVariation),
-                                                    style: TextStyle(
-                                                      fontSize: 14,
-                                                      color:
-                                                          asset.totalVariation >=
-                                                                  0
-                                                              ? Colors.grey
-                                                              : Colors.red,
-                                                    ),
-                                                  )
-                                                : Text(
-                                                    'R\$',
-                                                    style: TextStyle(
-                                                      fontSize: 14,
-                                                      color: isSelected
-                                                          ? Colors.black
-                                                          : Colors.grey,
-                                                    ),
-                                                  )
-                                          ],
-                                        ),
-                                      ],
-                                    ),
+                                    const SizedBox(height: 16),
+                                    const PortfolioUpcomingDividends(),
                                   ],
                                 ),
-                                selected: isSelected,
-                                onTap: () {
-                                  setState(() {
-                                    selectedAsset = isSelected
-                                        ? null
-                                        : asset; // Seleciona ou deseleciona o ativo
-                                  });
-                                  selectedBackgroundColor = (isSelected
-                                      ? Colors.grey[900]
-                                      : Colors.white)!; // Define a cor desejada
-                                },
                               ),
-                            ),
-                          );
-                        }
-                        // Retorna um Container vazio para ativos totalmente liquidados
-                        return Container();
-                      },
+                            ],
+                          )
+                        else
+                          // Mobile Stacked Layout
+                          Column(
+                            children: [
+                              PortfolioEvolutionChart(
+                                totalEquity: _totalPortfolioEquity,
+                                hideValues: _hideValues,
+                              ),
+                              const SizedBox(height: 16),
+                              PortfolioAllocationChart(
+                                assets: assets,
+                                totalPortfolioValue: _totalPortfolioEquity,
+                              ),
+                              const SizedBox(height: 16),
+                              PortfolioTopPerformance(
+                                assets: assets,
+                                onViewAll: () {},
+                              ),
+                              const SizedBox(height: 16),
+                              PortfolioMonthlyDividends(
+                                accumulatedDividends: 4520.00,
+                                hideValues: _hideValues,
+                              ),
+                              const SizedBox(height: 16),
+                              const PortfolioUpcomingDividends(),
+                            ],
+                          ),
+                      ],
                     ),
                   ),
-                ],
-              );
-      }),
-      bottomNavigationBar: SizedBox(
-        height: 70.0,
-        child: BottomAppBar(
-          shape: const CircularNotchedRectangle(),
-          child: Row(
-            mainAxisSize: MainAxisSize.max,
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _bottomAction(FontAwesomeIcons.clockRotateLeft, () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ExtratoPage(),
-                  ),
-                );
+                ),
+              ),
+      ),
+    );
+  }
 
-                _loadAssets();
-              }),
-              _bottomAction(
-                  FontAwesomeIcons.house, () => returnToHomePage(context)),
-              const SizedBox(width: 48.0),
-              _bottomAction(
-                  FontAwesomeIcons.chartPie, () => navigateToGraphPage(assets)),
-              _bottomAction(FontAwesomeIcons.bars, () => navigateToGraphPage),
+  void _showAddAssetDialog(BuildContext context) {
+    tickerController.clear();
+    segmentController.clear();
+    activeTypeController.text = 'Ação';
+    averagePriceController.clear();
+    currentPriceController.clear();
+    quantityController.clear();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppColors.cardDark,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          title: Row(
+            children: const [
+              Icon(Icons.add_circle_outline, color: AppColors.primaryBlue, size: 22),
+              SizedBox(width: 8),
+              Text('Adicionar Novo Ativo', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
             ],
           ),
-        ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: !isAddAssetDialogOpen && selectedAsset == null
-          ? Padding(
-              padding: const EdgeInsets.only(bottom: 16.0),
-              child: FloatingActionButton(
-                backgroundColor: Colors.grey,
-                shape: const CircleBorder(),
-                onPressed: () {
-                  _showAddAssetDialog(context);
-                },
-                elevation: 0.0,
-                child: const FaIcon(FontAwesomeIcons.plus, color: Colors.black),
+          content: SingleChildScrollView(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildTextField(tickerController, 'Ticker (ex: ITUB4)', uppercase: true),
+                  const SizedBox(height: 12),
+                  _buildTextField(segmentController, 'Empresa / Segmento (ex: Itaú Unibanco)'),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: 'Ação',
+                    dropdownColor: AppColors.inputDark,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: _inputDecoration('Tipo de Ativo'),
+                    items: const [
+                      DropdownMenuItem(value: 'Ação', child: Text('Ação (B3)')),
+                      DropdownMenuItem(value: 'FII', child: Text('FII (Imobiliário)')),
+                      DropdownMenuItem(value: 'Renda Fixa', child: Text('Renda Fixa')),
+                      DropdownMenuItem(value: 'Cripto', child: Text('Criptomoeda')),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) activeTypeController.text = val;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  _buildTextField(quantityController, 'Quantidade (ex: 100)', isNumber: true),
+                  const SizedBox(height: 12),
+                  _buildTextField(averagePriceController, 'Preço Médio R\$ (ex: 28.50)', isNumber: true),
+                  const SizedBox(height: 12),
+                  _buildTextField(currentPriceController, 'Preço Atual R\$ (ex: 34.90)', isNumber: true),
+                ],
               ),
-            )
-          : null,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryBlue,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () {
+                if (_formKey.currentState!.validate()) {
+                  final ticker = tickerController.text.toUpperCase().trim();
+                  final segment = segmentController.text.trim();
+                  final activeType = activeTypeController.text.trim();
+                  final qty = int.tryParse(quantityController.text.trim()) ?? 0;
+                  final avgPrice = double.tryParse(averagePriceController.text.replaceAll(',', '.').trim()) ?? 0.0;
+                  final currPrice = double.tryParse(currentPriceController.text.replaceAll(',', '.').trim()) ?? avgPrice;
+
+                  if (ticker.isNotEmpty && qty > 0 && avgPrice > 0) {
+                    _addAsset(Asset(
+                      ticker: ticker,
+                      activeType: activeType.isNotEmpty ? activeType : 'Ação',
+                      segment: segment.isNotEmpty ? segment : ticker,
+                      averagePrice: avgPrice,
+                      currentPrice: currPrice,
+                      quantity: qty,
+                      transactions: [],
+                      isFullyLiquidated: false,
+                    ));
+
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Ativo $ticker adicionado com sucesso!')),
+                    );
+                  }
+                }
+              },
+              child: const Text('Adicionar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showAssetActionModal(BuildContext context, Asset asset) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.cardDark,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Opções para ${asset.ticker}',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.grey, size: 20),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                leading: const Icon(Icons.analytics_outlined, color: AppColors.blueAccent),
+                title: const Text('Ver Análise Detalhada (TradingView/Investidor10)', style: TextStyle(color: Colors.white, fontSize: 13)),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ActiveDetailsPage(
+                        active: Active(
+                          icon: 'https://icons.brapi.dev/icons/${asset.ticker}.png',
+                          name: asset.segment.isNotEmpty ? asset.segment : asset.ticker,
+                          symbol: asset.ticker,
+                          lastPrice: asset.currentPrice,
+                          sector: asset.activeType,
+                          segment: asset.segment,
+                          dividendYield: 6.8,
+                          lastYearHigh: asset.currentPrice * 1.15,
+                          lastYearLow: asset.currentPrice * 0.85,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.receipt_long_outlined, color: AppColors.emeraldGreen),
+                title: const Text('Ver Extrato de Transações', style: TextStyle(color: Colors.white, fontSize: 13)),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => ExtratoPage()),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: AppColors.redLoss),
+                title: const Text('Remover Ativo da Carteira', style: TextStyle(color: AppColors.redLoss, fontSize: 13)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showDeleteConfirmDialog(context, asset);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showDeleteConfirmDialog(BuildContext context, Asset asset) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.cardDark,
+        title: const Text('Excluir Ativo', style: TextStyle(color: Colors.white)),
+        content: Text('Deseja realmente remover ${asset.ticker} da sua carteira?', style: const TextStyle(color: Colors.grey)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.redLoss),
+            onPressed: () {
+              _deleteAsset(asset);
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('${asset.ticker} removido da carteira.')),
+              );
+            },
+            child: const Text('Excluir', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTextField(TextEditingController controller, String label, {bool isNumber = false, bool uppercase = false}) {
+    return TextFormField(
+      controller: controller,
+      textCapitalization: uppercase ? TextCapitalization.characters : TextCapitalization.none,
+      keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+      style: const TextStyle(color: Colors.white, fontSize: 13),
+      decoration: _inputDecoration(label),
+      validator: (val) => (val == null || val.trim().isEmpty) ? 'Campo obrigatório' : null,
+    );
+  }
+
+  InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Colors.grey, fontSize: 12),
+      filled: true,
+      fillColor: AppColors.inputDark,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.borderDark)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.borderDark)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primaryBlue)),
     );
   }
 }

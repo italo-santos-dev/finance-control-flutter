@@ -38,16 +38,7 @@ Container(
   ),
   child: const Padding(
     padding: EdgeInsets.all(16.0),
-    child: Text('Card Consistente', style: TextStyle(color: AppColors.white)),
+    child: Text('Exemplo'),
   ),
 );
 ```
-
-# Critérios de aceite
-
-- 100% dos componentes utilizam tokens do `AppColors`.
-- Nenhuma cor hardcoded avulsa no código de UI.
-
-# Referências internas
-
-- [ui-design-system.skill.md](file:///skills/ui/ui-design-system.skill.md)

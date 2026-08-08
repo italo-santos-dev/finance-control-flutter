@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_investment_control/pages/home_page.dart';
-import 'package:flutter_investment_control/widgets/btc/bitcoin_card_widget.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({Key? key}) : super(key: key);
